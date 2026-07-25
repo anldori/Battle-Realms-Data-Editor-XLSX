@@ -88,6 +88,9 @@ class BRWorkbook:
         self.sheet_order: list[str] = []
         self.edits: dict[tuple[str, int, int], object] = {}   # (sheet,row0,col0)->value
         self.original: dict[tuple[str, int, int], object] = {}
+        # Populated by the Compare feature: (sheet, row0, col0) -> (mine, theirs)
+        self.diff_cells: dict[tuple[str, int, int], tuple] = {}
+        self.diff_label = ''
         self._enum2sheet = None
         self._load(progress)
 

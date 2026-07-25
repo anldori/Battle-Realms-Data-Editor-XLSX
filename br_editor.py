@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QFileDialog, QHeaderView,
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import br_compare
 import br_core
 from br_model import EnumDelegate, MultiSetCommand, RowFilter, SheetModel, coerce
 
@@ -90,6 +91,16 @@ RIGHT-CLICK ON AN ENUM CELL
   "Go to Data_..."      opens the exact record being referenced.
   "Open code table..."  shows the full list of codes.
 
+COMPARING TWO FILES
+  Compare > Compare with another file...  (Ctrl+D)
+  Pick a second .xlsx and every difference is listed: sheet, row, column,
+  your value and theirs. Differing cells are also tinted purple in the grid.
+  Double-click a row in the report to jump straight to that cell.
+  "Take other value" copies their value into your file as a normal edit.
+  "Export to CSV..." saves the whole report.
+  Rows are matched by their Type key, not by position, so inserting a
+  record does not make every row below it look changed.
+
 SAVING
   Ctrl+S overwrites the open file and creates a timestamped .bak copy first.
   Only the edited cells are patched inside the XML; the rest of the file stays
@@ -110,6 +121,8 @@ class MainWindow(QMainWindow):
         self.undo = QUndoStack(self)
         self.undo.cleanChanged.connect(lambda _c: self._update_title())
         self._models: dict[str, SheetModel] = {}
+        self._compare_dlg = None
+        self._compare_result = None
 
         self._build_ui()
         self.setAcceptDrops(True)
@@ -147,6 +160,13 @@ class MainWindow(QMainWindow):
                               'Restore the selected cells to their original values')
         self.a_addrow = mkact('Add &row', self.on_add_row, 'Ctrl+Shift+N')
         self.a_edits = mkact('List &edited cells...', self.on_show_edits, 'Ctrl+E')
+        self.a_compare = mkact('&Compare with another file...', self.on_compare,
+                               'Ctrl+D',
+                               'Pick a second .xlsx and list every difference')
+        self.a_cmp_again = mkact('Compare with &last file again', self.on_compare_last)
+        self.a_cmp_show = mkact('&Show last report', self.on_compare_show)
+        self.a_cmp_clear = mkact('Cl&ear comparison', self.on_compare_clear,
+                                 None, 'Remove the comparison highlighting')
         self.a_find = mkact('&Filter rows', self.focus_filter, 'Ctrl+F')
         self.a_gosheet = mkact('&Go to sheet...', self.on_goto_sheet, 'Ctrl+P')
         self.a_desc = mkact('Show enum &descriptions')
@@ -186,6 +206,13 @@ class MainWindow(QMainWindow):
         m_view.addAction(self.a_gosheet)
         m_view.addAction(self.a_edits)
 
+        m_cmp = mb.addMenu('&Compare')
+        m_cmp.addAction(self.a_compare)
+        m_cmp.addAction(self.a_cmp_again)
+        m_cmp.addSeparator()
+        m_cmp.addAction(self.a_cmp_show)
+        m_cmp.addAction(self.a_cmp_clear)
+
         m_help = mb.addMenu('&Help')
         m_help.addAction(self.a_help)
         m_help.addAction(self.a_about)
@@ -203,6 +230,8 @@ class MainWindow(QMainWindow):
         tb.addAction(self.a_revert)
         tb.addAction(self.a_edits)
         tb.addAction(self.a_addrow)
+        tb.addSeparator()
+        tb.addAction(self.a_compare)
         tb.addSeparator()
 
         self.chk_desc = QCheckBox('Show enum descriptions')
@@ -414,8 +443,13 @@ class MainWindow(QMainWindow):
         # a_undo / a_redo manage their own enabled state via QUndoStack
         for a in (self.a_save, self.a_saveas, self.a_close, self.a_copy,
                   self.a_paste, self.a_clear, self.a_revert, self.a_addrow,
-                  self.a_edits, self.a_find, self.a_gosheet, self.a_desc):
+                  self.a_edits, self.a_find, self.a_gosheet, self.a_desc,
+                  self.a_compare, self.a_cmp_again):
             a.setEnabled(on)
+        # these two only make sense once a comparison has actually been run
+        if not on:
+            self.a_cmp_show.setEnabled(False)
+            self.a_cmp_clear.setEnabled(False)
         self.chk_desc.setEnabled(on)
         self.ed_filter.setEnabled(on)
         self.ed_sheet.setEnabled(on)
@@ -470,6 +504,7 @@ class MainWindow(QMainWindow):
         dlg.close()
         self.settings.setValue('lastdir', os.path.dirname(path))
         self._push_recent(path)
+        self._discard_comparison()
         self._models.clear()
         self.undo.clear()
         self._set_file_actions_enabled(True)
@@ -486,6 +521,7 @@ class MainWindow(QMainWindow):
             return
         if self.book.dirty and not self._confirm_discard():
             return
+        self._discard_comparison()
         self.book = None
         self.model = None
         self._models.clear()
@@ -586,12 +622,15 @@ class MainWindow(QMainWindow):
             return
         self.show_sheet(name)
 
-    def show_sheet(self, name, focus_row=None, focus_col=0):
+    def _model_for(self, name):
         if name not in self._models:
             m = SheetModel(self.book, name, self.undo, self)
             m.dataChanged.connect(lambda *_: self._update_title())
             self._models[name] = m
-        self.model = self._models[name]
+        return self._models[name]
+
+    def show_sheet(self, name, focus_row=None, focus_col=0):
+        self.model = self._model_for(name)
         self.model.show_desc = self.chk_desc.isChecked()
         self.proxy.setSourceModel(self.model)
         self.tbl.setItemDelegate(EnumDelegate(self.book, self.tbl))
@@ -750,6 +789,188 @@ class MainWindow(QMainWindow):
             i = lines.index(item)
             (sh, r, c) = sorted(self.book.edits.keys())[i]
             self.show_sheet(sh, r, c)
+
+    # ------------------------------------------------------------- compare
+    def on_compare(self):
+        if not self.book:
+            return
+        last = self.settings.value('comparedir') or os.path.dirname(self.book.path)
+        path, _ = QFileDialog.getOpenFileName(
+            self, 'Choose the file to compare against', last,
+            'Excel workbook (*.xlsx *.xlsm);;All files (*.*)')
+        if path:
+            self._run_compare(path)
+
+    def on_compare_last(self):
+        last = self.settings.value('comparelast')
+        if not self.book:
+            return
+        if not last:
+            self.on_compare()
+            return
+        if not os.path.exists(last):
+            QMessageBox.warning(self, APP_NAME,
+                                f'File not found:\n{last}\n\n'
+                                'It may have been moved or deleted.')
+            return
+        self._run_compare(last)
+
+    def _run_compare(self, other_path):
+        if os.path.normcase(os.path.abspath(other_path)) == \
+                os.path.normcase(os.path.abspath(self.book.path)):
+            QMessageBox.information(
+                self, APP_NAME,
+                'That is the file you already have open. Choose a different one '
+                'to compare against.')
+            return
+        if self.book.dirty:
+            r = QMessageBox.question(
+                self, APP_NAME,
+                f'You have {len(self.book.edits)} unsaved edits.\n\n'
+                'The comparison uses your edited values, so unsaved changes will '
+                'show up as differences. Continue?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if r != QMessageBox.StandardButton.Yes:
+                return
+
+        dlg = QProgressDialog('Comparing...', None, 0, 100, self)
+        dlg.setWindowTitle(APP_NAME)
+        dlg.setWindowModality(Qt.WindowModality.ApplicationModal)
+        dlg.setMinimumDuration(0)
+        dlg.setCancelButton(None)
+        dlg.show()
+        QApplication.processEvents()
+
+        def prog(i, total, name):
+            dlg.setValue(int(i * 100 / max(total, 1)))
+            dlg.setLabelText(f'Comparing: {name}')
+            QApplication.processEvents()
+
+        try:
+            result = br_compare.compare(self.book, other_path, progress=prog)
+        except Exception as e:
+            dlg.close()
+            QMessageBox.critical(
+                self, APP_NAME,
+                f'Could not compare the files:\n{e}\n\n{traceback.format_exc()}')
+            return
+        dlg.close()
+
+        self.settings.setValue('comparedir', os.path.dirname(other_path))
+        self.settings.setValue('comparelast', os.path.abspath(other_path))
+        self._compare_result = result
+
+        if not result.diffs and not result.sheets_only_mine \
+                and not result.sheets_only_theirs:
+            self.on_compare_clear()
+            QMessageBox.information(
+                self, APP_NAME,
+                'No differences found - the two files hold the same data.')
+            self.lbl_status.setText('Compare: no differences found.')
+            return
+
+        self.book.diff_cells = result.cell_map()
+        self.book.diff_label = os.path.basename(other_path)
+        self._refresh_models()
+
+        self._open_compare_dialog(result)
+
+        self.a_cmp_show.setEnabled(True)
+        self.a_cmp_clear.setEnabled(True)
+        self.lbl_status.setText(
+            f'Compare: {len(result.diffs)} differences against '
+            f'{os.path.basename(other_path)}')
+
+    def _open_compare_dialog(self, result):
+        """Close any previous report window and show a fresh one."""
+        if self._compare_dlg is not None:
+            self._compare_dlg.close()
+        d = br_compare.CompareDialog(self.book, result, self)
+        d.jumpRequested.connect(self._on_diff_jump)
+        d.applyRequested.connect(self._on_diff_apply)
+        d.highlightToggled.connect(self._on_diff_highlight)
+        d.finished.connect(self._on_compare_dlg_closed)
+        self._compare_dlg = d
+        d.show()
+
+    def _on_compare_dlg_closed(self, _result):
+        d, self._compare_dlg = self._compare_dlg, None
+        if d is not None:
+            d.deleteLater()
+
+    def on_compare_show(self):
+        if self._compare_dlg is not None:
+            self._compare_dlg.show()
+            self._compare_dlg.raise_()
+            self._compare_dlg.activateWindow()
+        elif self._compare_result is not None:
+            self._open_compare_dialog(self._compare_result)
+        else:
+            self.on_compare()
+
+    def _discard_comparison(self):
+        """Drop all comparison state. Used when switching or closing files."""
+        if self._compare_dlg is not None:
+            dlg, self._compare_dlg = self._compare_dlg, None
+            dlg.finished.disconnect(self._on_compare_dlg_closed)
+            dlg.close()
+            dlg.deleteLater()
+        self._compare_result = None
+        if self.book:
+            self.book.diff_cells = {}
+            self.book.diff_label = ''
+        self.a_cmp_show.setEnabled(False)
+        self.a_cmp_clear.setEnabled(False)
+
+    def on_compare_clear(self):
+        had = self._compare_result is not None
+        self._discard_comparison()
+        if self.book:
+            self._refresh_models()
+        self.lbl_status.setText('Comparison cleared.' if had
+                                else 'No comparison to clear.')
+
+    def _on_diff_jump(self, sheet, row, col):
+        if sheet in self.book.sheets:
+            self.show_sheet(sheet, row, col)
+            self.raise_()
+            self.activateWindow()
+
+    def _on_diff_apply(self, items):
+        by_sheet = {}
+        for sheet, row, col, value in items:
+            by_sheet.setdefault(sheet, []).append((row, col, value))
+        self.undo.beginMacro(f'Take {len(items)} value(s) from compared file')
+        try:
+            for sheet, cells in by_sheet.items():
+                model = self._model_for(sheet)
+                payload = []
+                for row, col, value in cells:
+                    old = model.raw(row, col)
+                    if old != value:
+                        payload.append((row, col, old, value))
+                if payload:
+                    self.undo.push(MultiSetCommand(
+                        model, payload, f'{sheet}: take {len(payload)} value(s)'))
+        finally:
+            self.undo.endMacro()
+        self._update_title()
+        self.lbl_status.setText(
+            f'Copied {len(items)} value(s) from the compared file. '
+            'Press Ctrl+S to write them to disk.')
+
+    def _on_diff_highlight(self, on):
+        if not self.book:
+            return
+        if on and self._compare_result is not None:
+            self.book.diff_cells = self._compare_result.cell_map()
+        else:
+            self.book.diff_cells = {}
+        self._refresh_models()
+
+    def _refresh_models(self):
+        for m in self._models.values():
+            m.refresh_all()
 
     # -------------------------------------------------------------- menu
     def on_context_menu(self, pos):

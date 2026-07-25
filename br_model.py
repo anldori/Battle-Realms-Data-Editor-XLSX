@@ -13,6 +13,7 @@ EDITED_FG = QColor(140, 90, 0)
 ENUM_BG = QColor(238, 246, 255)
 KEY_BG = QColor(240, 240, 240)
 INVALID_FG = QColor(190, 60, 60)
+DIFF_BG = QColor(232, 221, 250)          # cell differs from the compared file
 
 
 class SheetModel(QAbstractTableModel):
@@ -89,6 +90,8 @@ class SheetModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.BackgroundRole:
             if (self.sheet, r, c) in self.book.edits:
                 return QBrush(EDITED_BG)
+            if (self.sheet, r, c) in self.book.diff_cells:
+                return QBrush(DIFF_BG)
             if c == 0:
                 return QBrush(KEY_BG)
             if tbl:
@@ -109,6 +112,11 @@ class SheetModel(QAbstractTableModel):
                     lines.append('!! Code does not exist in the enum table')
             if (self.sheet, r, c) in self.book.edits:
                 lines.append(f'Original: {self.book.original.get((self.sheet, r, c))}')
+            d = self.book.diff_cells.get((self.sheet, r, c))
+            if d:
+                lines.append(f'--- compared with {self.book.diff_label} ---')
+                lines.append(f'This file: {d[0]}')
+                lines.append(f'Other file: {d[1]}')
             return '\n'.join(lines)
 
         if role == Qt.ItemDataRole.TextAlignmentRole:
