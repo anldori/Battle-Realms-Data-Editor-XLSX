@@ -1,5 +1,5 @@
 """
-br_model.py - Table model, cell delegate and undo commands for the data grid.
+brde.model - Table model, cell delegate and undo commands for the data grid.
 """
 from __future__ import annotations
 
@@ -81,7 +81,7 @@ class SheetModel(QAbstractTableModel):
                 return ''
             if tbl and self.show_desc and isinstance(val, int):
                 d = tbl.code2desc.get(val)
-                return f'{val} — {d}' if d else str(val)
+                return f'{val} - {d}' if d else str(val)
             return str(val)
 
         if role == Qt.ItemDataRole.EditRole:
@@ -152,6 +152,14 @@ class SheetModel(QAbstractTableModel):
         self.endResetModel()
 
 
+def _is_number(s: str) -> bool:
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+
 def coerce(value, previous):
     """Convert user-typed text into the right type (int / float / str / None)."""
     if value is None:
@@ -161,9 +169,16 @@ def coerce(value, previous):
     s = str(value).strip()
     if s == '':
         return None
-    # 'code — DESCRIPTION' coming back from a combobox
-    if '—' in s:
-        s = s.split('—', 1)[0].strip()
+    # 'code - DESCRIPTION' coming back from a combobox.
+    # Split on ' - ' with the spaces, never a bare '-', so a negative code such as
+    # '-1 - NONE' keeps its sign. Only strip the label when what precedes the
+    # separator really is a number, so plain text like 'Foo - Bar' survives.
+    for sep in (' - ', ' — '):
+        if sep in s:
+            head = s.split(sep, 1)[0].strip()
+            if _is_number(head):
+                s = head
+                break
     try:
         return int(s)
     except ValueError:
@@ -226,7 +241,7 @@ class EnumDelegate(QStyledItemDelegate):
         cb.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         cb.setMaxVisibleItems(20)
         for code, desc, _g in tbl.items:
-            cb.addItem(f'{code} — {desc}' if desc else str(code), code)
+            cb.addItem(f'{code} - {desc}' if desc else str(code), code)
         comp = QCompleter([cb.itemText(i) for i in range(cb.count())], cb)
         comp.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         comp.setFilterMode(Qt.MatchFlag.MatchContains)

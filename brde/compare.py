@@ -1,5 +1,5 @@
 """
-br_compare.py - Compare the open workbook against another Battle Realms.xlsx
+brde.compare - Compare the open workbook against another Battle Realms.xlsx
 
 The comparison matches sheets by name, columns by header text and rows by their
 primary key (the first column) whenever that key is unique. Falling back to
@@ -14,11 +14,10 @@ import os
 import openpyxl
 
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor, QFont
+from PyQt6.QtGui import QBrush, QColor
 from PyQt6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QFileDialog,
                              QHBoxLayout, QHeaderView, QLabel, QLineEdit,
-                             QMessageBox, QPushButton, QTableView, QVBoxLayout,
-                             QWidget)
+                             QMessageBox, QPushButton, QTableView, QVBoxLayout)
 
 CHANGED = 'changed'
 ONLY_MINE = 'only_mine'
@@ -228,7 +227,7 @@ class DiffModel(QAbstractTableModel):
             if tbl:
                 desc = tbl.code2desc.get(value)
                 if desc:
-                    return f'{value} — {desc}'
+                    return f'{value} - {desc}'
         return str(value)
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
@@ -240,7 +239,7 @@ class DiffModel(QAbstractTableModel):
             if c == 0:
                 return d.sheet
             if c == 1:
-                return str(d.row + 2) if d.row >= 0 else '—'
+                return str(d.row + 2) if d.row >= 0 else '-'
             if c == 2:
                 return '' if d.key is None else str(d.key)
             if c == 3:

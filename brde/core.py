@@ -1,5 +1,5 @@
 """
-br_core.py - Read/write engine for Battle Realms.xlsx
+brde.core - Read/write engine for Battle Realms.xlsx
 
 Reading: openpyxl in read-only mode, which is fast and only needs the values.
 Writing: NOT openpyxl. Instead the XML inside the .xlsx archive is patched in
@@ -16,7 +16,7 @@ from datetime import datetime
 
 import openpyxl
 
-import br_schema as schema
+from . import schema
 
 NS_MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
 

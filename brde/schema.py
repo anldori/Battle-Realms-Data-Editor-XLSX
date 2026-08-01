@@ -1,5 +1,5 @@
 """
-br_schema.py - Schema inference for Battle Realms.xlsx
+brde.schema - Schema inference for Battle Realms.xlsx
 
 Works out which columns in the Data_* sheets reference which Enum_* sheet, so
 the GUI can offer a dropdown instead of making the user look up raw numbers.
@@ -93,6 +93,19 @@ EXPLICIT_RULES = [
     (r'^UVA\d*$', 'UVAType'),
 ]
 EXPLICIT_RE = [(re.compile(p, re.I), e) for p, e in EXPLICIT_RULES]
+
+# Columns whose name reads as a yes/no question. Checked before name matching,
+# because a trailing noun otherwise drags them into the wrong enum: 'IsFireWeapon'
+# ends in 'Weapon' and its 0/1 values happen to be valid WeaponType codes, so it
+# would be shown as 'WEAPON_ARAH_ARROW'. Only applied when the column really does
+# hold nothing but 0 and 1.
+BOOL_PREFIX_RE = re.compile(
+    r'^(Is|Can|Has|Should|Allow|Allows|Use|Uses|Enable|Enables|Prefers|Affects|'
+    r'Only|Always|Never|No)[A-Z]')
+
+# Armour multipliers. Floats in Data_Units, but Data_Buildings stores whole
+# numbers, which would otherwise be mistaken for a yes/no column.
+ARMOR_RE = re.compile(r'^AM(Cutting|Piercing|Blunt|Fire|Explosive|Magical)$')
 
 # Marker used in place of an enum name for boolean (0/1) columns.
 BOOL_ENUM = '@bool'
@@ -226,7 +239,10 @@ def infer_column_enum(sheet: str, col: str, values, enums: dict, self_enum=None)
 
     Every candidate must pass a coverage check - all values in the column have
     to exist in the enum (with -1 always allowed as "none / invalid") - so a
-    name that merely looks right is rejected when the data disagrees.
+    name that merely looks right is rejected when the data disagrees. The
+    coverage check alone is not enough for small code ranges, though: a 0/1
+    column passes against almost any enum, which is why the yes/no phrasing test
+    runs before name matching.
     """
     if not values:
         return None
@@ -237,23 +253,31 @@ def infer_column_enum(sheet: str, col: str, values, enums: dict, self_enum=None)
     if colname.lower() in ('type', 'code') and self_enum:
         return self_enum
 
-    # 2. hand-written rules
+    # 2. armour multipliers are always plain numbers
+    if ARMOR_RE.match(colname):
+        return None
+
+    # 3. yes/no phrasing wins over any name match, but only if the data agrees
+    if BOOL_PREFIX_RE.match(colname) and sv <= {0, 1}:
+        return BOOL_ENUM
+
+    # 4. hand-written rules
     for rx, ename in EXPLICIT_RE:
         if rx.search(colname) and ename in enums:
             if sv <= enums[ename] | {-1}:
                 return ename
 
-    # 3. numeric blacklist
+    # 5. numeric blacklist
     if any(rx.search(colname) for rx in NUMERIC_RE):
         return None
 
-    # 4. name matching + coverage check
+    # 6. name matching + coverage check
     sheet_base = sheet.split('_', 1)[1] if '_' in sheet else sheet
     for cand in _name_candidates(colname, sheet_base, enums):
         if sv <= enums[cand] | {-1}:
             return cand
 
-    # 5. boolean: only 0/1 present -> Yes/No dropdown (other values still typable)
+    # 7. boolean: only 0/1 present -> Yes/No dropdown (other values still typable)
     if sv <= {0, 1}:
         return BOOL_ENUM
     return None
