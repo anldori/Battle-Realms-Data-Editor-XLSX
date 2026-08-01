@@ -73,22 +73,50 @@ def _find_row(book, sheet, code):
     return None
 
 
-def record_title(book, sheet, row):
-    """Best human label for a record: its Name column, else its enum description."""
+# Column 1 headers that hold a name a person would search for. Thirty-two sheets
+# call it Name, but the ability, weapon and dialogue tables do not, which is why
+# searching for "Dragon Skin" used to find nothing even though the record page
+# was already showing that name. Asset path columns - FileName, RelativePath -
+# are deliberately left out: they are not what anyone types into the box.
+NAME_HEADERS = {'name', 'actualability', 'actualweapon', 'actorname'}
+
+
+def name_col(book, sheet):
+    """Index of the column holding a readable name, or None."""
     sd = book.sheets.get(sheet)
-    if sd is None:
-        return sheet
-    name = ''
-    if len(sd.headers) > 1 and sd.headers[1].lower() == 'name':
-        v = book.value(sheet, row, 1)
-        name = str(v) if v is not None else ''
+    if sd is None or len(sd.headers) < 2:
+        return None
+    return 1 if sd.headers[1].lower() in NAME_HEADERS else None
+
+
+def record_name(book, sheet, row):
+    """The record's own name, as text, or ''."""
+    c = name_col(book, sheet)
+    if c is None:
+        return ''
+    v = book.value(sheet, row, c)
+    return str(v).strip() if v is not None else ''
+
+
+def record_desc(book, sheet, row):
+    """The record's description from the enum that keys its sheet, or ''."""
+    sd = book.sheets.get(sheet)
     code = book.value(sheet, row, 0)
-    desc = ''
-    if sd.self_enum and isinstance(code, int):
-        tbl = book.enums.get(sd.self_enum)
-        if tbl:
-            desc = tbl.code2desc.get(code, '')
-    if name and desc:
+    if sd is None or not sd.self_enum or not isinstance(code, int):
+        return ''
+    tbl = book.enums.get(sd.self_enum)
+    return tbl.code2desc.get(code, '') if tbl else ''
+
+
+def record_title(book, sheet, row):
+    """Best human label for a record: its name, else its enum description."""
+    if book.sheets.get(sheet) is None:
+        return sheet
+    name = record_name(book, sheet, row)
+    desc = record_desc(book, sheet, row)
+    # Data_Weapons.ActualWeapon repeats the enum description word for word, so
+    # without this the title reads "WEAPON_ARAH_BOW  (WEAPON_ARAH_BOW)".
+    if name and desc and name != desc:
         return f'{name}  ({desc})'
     return name or desc or f'{sheet} row {row + 2}'
 
@@ -485,6 +513,31 @@ def _building_prereqs(book, sheet, row):
 _building_prereqs.consumes = [('Data_BuildingTechTree', 'Type')]
 
 
+def _building_docking(book, sheet, row):
+    """The docking slots, with the ability a docked unit gains expanded.
+
+    Only two buildings use it in the vanilla file - the Dragon Monument and the
+    Lotus Warlock's Tower - and the ability behind the code is what the docking
+    actually does, so it is worth following rather than leaving as a number.
+    """
+    out = []
+    for name in ('UnitToDock', 'DockingUnitCount', 'DockedAbility',
+                 'DockingTrainingTime', 'DockingUnitToSpawn'):
+        c = _col(book, sheet, name)
+        if c is None:
+            continue
+        f = Field(name, sheet, row, c)
+        if name != 'DockedAbility':
+            out.append(f)
+            continue
+        stats, arow = _ability_block(book, book.value(sheet, row, c), indent=1)
+        if arow is not None:
+            f.link = ('Data_Abilities', arow)
+        out.append(f)
+        out.extend(stats)
+    return out
+
+
 def _weapon_wielders(book, sheet, row):
     """Units that carry this weapon."""
     code = book.value(sheet, row, 0)
@@ -575,8 +628,7 @@ PROFILES = {
                          'UpgradeWaterCost', 'UpgradeRiceRefund',
                          'UpgradeWaterRefund', 'UnlocksBuildingType',
                          'NumOfBuildingsUnlocked']),
-        ('Docking', ['UnitToDock', 'DockingUnitCount', 'DockedAbility',
-                     'DockingTrainingTime', 'DockingUnitToSpawn']),
+        ('Docking', _building_docking),
         ('AI', ['AIOffensiveScore', 'AIDefensiveScore', 'AIMaxDefault',
                 'AIMustHaveFirstPass', 'AIBuildingPriority',
                 'YinScore', 'YangScore']),
@@ -772,15 +824,14 @@ class RecordIndex:
             sd = book.sheets[name]
             if not sd.headers:
                 continue
-            has_name = len(sd.headers) > 1 and sd.headers[1].lower() == 'name'
-            tbl = book.enums.get(sd.self_enum) if sd.self_enum else None
             rank = self.SHEET_RANK.get(name, self.OTHER_RANK)
             for i in range(len(sd.rows)):
-                code = book.value(name, i, 0)
-                nm = str(book.value(name, i, 1) or '') if has_name else ''
-                desc = tbl.code2desc.get(code, '') if tbl and isinstance(code, int) else ''
+                nm = record_name(book, name, i)
+                desc = record_desc(book, name, i)
                 if not nm and not desc:
                     continue
+                if nm == desc:          # ActualWeapon repeats the enum text
+                    nm = ''
                 title = f'{nm} - {desc}' if nm and desc else (nm or desc)
                 self.entries.append(
                     (name, i, title, f'{nm}\n{desc}\n{name}'.lower(), rank))

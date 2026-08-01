@@ -33,6 +33,15 @@ CHANGELOG = [
         'different column are still listed.',
         'Techniques now name the ability they change instead of showing a bare '
         'code number.',
+        '<b>Records are findable by their real name.</b> Only 32 of the 87 data '
+        'sheets call the name column "Name" - abilities call it ActualAbility, '
+        'weapons ActualWeapon - so searching for "Dragon Skin" or "Sight Beyond '
+        'Sight" found nothing, even though the record page was already showing '
+        'that name. The record you meant still ranks first: "samurai" leads '
+        'with the Dragon Samurai, not with its sound effects.',
+        '<b>A building\'s docked ability is spelled out</b>, the way a unit\'s '
+        'abilities are. The Dragon Monument and the Lotus Warlock\'s Tower now '
+        'show what docking there actually does.',
         '<b>Battle gear columns showed bare numbers.</b> A hero\'s '
         'DefaultBattleGear read "82" instead of naming the gear, and the gear '
         'combination columns had no dropdown at all. Hero Arah now shows '

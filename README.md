@@ -160,6 +160,14 @@ from `CHANGELOG` in `brde/about.py`.
   properly are no longer repeated at the bottom of the page under a worse label.
   References into the same sheet through a different column are still listed.
 - Techniques now name the ability they change instead of showing a bare code number.
+- **Records are findable by their real name.** Only 32 of the 87 data sheets call the
+  name column `Name` - abilities call it `ActualAbility`, weapons `ActualWeapon` - so
+  searching for "Dragon Skin" or "Sight Beyond Sight" found nothing, even though the
+  record page was already showing that name. The record you meant still ranks first:
+  "samurai" leads with the Dragon Samurai, not with its sound effects.
+- **A building's docked ability is spelled out**, the way a unit's abilities are. The
+  Dragon Monument and the Lotus Warlock's Tower now show what docking there actually
+  does.
 - **Battle gear columns showed bare numbers.** A hero's `DefaultBattleGear` read
   `82` instead of naming the gear, and the gear combination columns had no dropdown
   at all. Hero Arah now shows `BATTLE_GEAR_HERO_ARAH_ZEN_ARROWS` and the ability
