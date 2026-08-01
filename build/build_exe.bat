@@ -111,17 +111,25 @@ echo.
 
 REM ---- 4. optional icon ------------------------------------------------------
 REM  build\icon.ico wins, then icon.ico in the project root.
+REM
+REM  Two switches, and both are needed. --icon writes the icon into the .exe as
+REM  a Windows resource, which is what File Explorer shows. --add-data ships the
+REM  same file inside the bundle so brde.app.icon_path() can find it at run time
+REM  and hand it to QApplication.setWindowIcon - that is what paints the title
+REM  bar and the taskbar button. With only --icon the window keeps Qt's default.
 set "ICON="
+set "ICONSRC="
 if exist "%HERE%icon.ico" (
-    set "ICON=--icon "%HERE%icon.ico""
+    set "ICONSRC=%HERE%icon.ico"
     echo Icon: build\icon.ico
 ) else if exist "%ROOT%\icon.ico" (
-    set "ICON=--icon "%ROOT%\icon.ico""
+    set "ICONSRC=%ROOT%\icon.ico"
     echo Icon: icon.ico
 ) else (
     echo Icon: none found, using the default.
     echo       To use your own, put icon.ico next to this script.
 )
+if defined ICONSRC set "ICON=--icon "%ICONSRC%" --add-data "%ICONSRC%;.""
 echo.
 
 REM ---- 5. build --------------------------------------------------------------
@@ -161,6 +169,18 @@ echo.
 
 if errorlevel 1 goto build_failed
 
+REM ---- 6. tidy up ------------------------------------------------------------
+REM  Only on success. A failed build leaves _work in place on purpose - the
+REM  warn-*.txt and xref-*.html files in there are what you read to find out
+REM  why it failed. Nothing is lost by deleting it after a good build: the spec
+REM  is regenerated from this script's own switches every time, and --clean
+REM  discards the cache anyway.
+if exist "%WORK%" (
+    echo Cleaning up build\_work ...
+    rmdir /s /q "%WORK%" 2>nul
+    if exist "%WORK%" echo    [note] Some files were in use and stayed behind.
+)
+
 echo.
 echo ============================================================
 echo   Build finished.
@@ -172,8 +192,6 @@ if "%MODE%"=="--onedir" (
 ) else (
     echo   Your program:  dist\%NAME%.exe
 )
-echo.
-echo   Intermediate files sit in  build\_work  and can be deleted.
 echo.
 if "%~1"=="" pause
 exit /b 0
@@ -188,6 +206,7 @@ exit /b 1
 :build_failed
 echo.
 echo [ERROR] The build failed. The PyInstaller output above says why.
+echo         Intermediate files were kept in  build\_work  for diagnosis.
 echo.
 if "%~1"=="" pause
 exit /b 1

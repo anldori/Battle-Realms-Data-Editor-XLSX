@@ -160,6 +160,8 @@ from `CHANGELOG` in `brde/about.py`.
   properly are no longer repeated at the bottom of the page under a worse label.
   References into the same sheet through a different column are still listed.
 - Techniques now name the ability they change instead of showing a bare code number.
+- **The window now carries the program icon** in the title bar and on the taskbar,
+  not just in File Explorer.
 
 **1.1.0**
 

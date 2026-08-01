@@ -14,7 +14,7 @@ import sys
 import traceback
 
 from PyQt6.QtCore import QSettings, Qt, QTimer
-from PyQt6.QtGui import QAction, QFont, QKeySequence, QUndoStack
+from PyQt6.QtGui import QAction, QFont, QIcon, QKeySequence, QUndoStack
 from PyQt6.QtWidgets import (QApplication, QCheckBox, QFileDialog, QHeaderView,
                              QInputDialog, QLabel, QLineEdit, QListWidget,
                              QListWidgetItem, QMainWindow, QMenu, QMessageBox,
@@ -1144,10 +1144,66 @@ class MainWindow(QMainWindow):
         self.lbl_dirty.setText(f'{n} cells edited' if n else 'Saved')
 
 
+APP_ID = 'BRDE.BattleRealmsDataEditor'
+
+
+def icon_path():
+    r"""Locate icon.ico, running from source or from a PyInstaller bundle.
+
+    PyInstaller's --icon only writes the icon into the .exe as a Windows
+    resource, which is what File Explorer reads. The title bar and the taskbar
+    button are drawn by Qt from the *window* icon, so the file has to be shipped
+    as data as well and loaded at run time - see --add-data in build_exe.bat.
+
+    Search order:
+      sys._MEIPASS      the bundle's data directory (onefile temp dir, and
+                        dist\<name>\_internal on PyInstaller 6+ onedir)
+      the .exe's folder older onedir layouts put data next to the executable
+      the project root  running from source, where it lives in build\
+    """
+    roots = []
+    base = getattr(sys, '_MEIPASS', None)
+    if base:
+        roots.append(base)
+    if getattr(sys, 'frozen', False):
+        roots.append(os.path.dirname(os.path.abspath(sys.executable)))
+    roots.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    for r in roots:
+        for name in ('icon.ico', os.path.join('build', 'icon.ico')):
+            p = os.path.join(r, name)
+            if os.path.exists(p):
+                return p
+    return None
+
+
+def _set_windows_app_id(app_id=APP_ID):
+    """Give Windows an explicit identity for this process.
+
+    Without it the taskbar groups the window under whichever host process
+    started it - python.exe when running from source - and labels the button
+    with that program's icon rather than ours. It also stops a pinned shortcut
+    from matching the running window. Must be called before the first window
+    is created. Silently does nothing anywhere but Windows.
+    """
+    if sys.platform != 'win32':
+        return
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+    except Exception:
+        pass          # cosmetic only, never worth failing the launch over
+
+
 def main(argv=None):
     argv = list(sys.argv if argv is None else argv)
+    _set_windows_app_id()
     app = QApplication(argv)
     app.setApplicationName(APP_NAME)
+    # Set on the application, not the window, so the About, details and compare
+    # dialogs pick it up too.
+    p = icon_path()
+    if p:
+        app.setWindowIcon(QIcon(p))
     # Only auto-open when a path was passed on the command line (or a file was
     # dropped on the shortcut). Otherwise show the welcome screen so the user
     # picks a file through the menu.
