@@ -33,6 +33,15 @@ CHANGELOG = [
         'different column are still listed.',
         'Techniques now name the ability they change instead of showing a bare '
         'code number.',
+        '<b>Buildings show what they research.</b> A tavern or a dojo never '
+        'listed its techniques and upgrades, because those sheets point at the '
+        'building rather than the other way round. There is now a "Researched '
+        'here" section with the cost, time and affected units of each one, plus '
+        'a "Requires" section for the buildings needed first. The old '
+        '"Upgrades to" section is now called "Upgrades into another building", '
+        'which is what it always meant.',
+        '<b>The window now carries the program icon</b> in the title bar and on '
+        'the taskbar, not just in File Explorer.',
     ]),
     ('1.1.0', '', [
         '<b>Compare two files.</b> Diff your mod against vanilla, or two '

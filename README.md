@@ -160,6 +160,12 @@ from `CHANGELOG` in `brde/about.py`.
   properly are no longer repeated at the bottom of the page under a worse label.
   References into the same sheet through a different column are still listed.
 - Techniques now name the ability they change instead of showing a bare code number.
+- **Buildings show what they research.** A tavern or a dojo never listed its
+  techniques and upgrades, because those sheets point at the building rather than the
+  other way round. There is now a "Researched here" section with the cost, time and
+  affected units of each one, plus a "Requires" section for the buildings needed
+  first. The old "Upgrades to" section is now called "Upgrades into another
+  building", which is what it always meant.
 - **The window now carries the program icon** in the title bar and on the taskbar,
   not just in File Explorer.
 

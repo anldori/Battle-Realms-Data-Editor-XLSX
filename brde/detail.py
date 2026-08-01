@@ -153,6 +153,16 @@ SPELL_STATS = ['Range', 'StaminaCost', 'MinStamina', 'TargetEffect', 'AnimState'
 TECHNIQUE_STATS = ['YangNeeded', 'Cost', 'Time', 'AssociatedBuilding',
                    'AbilityAffected1', 'AbilityAffected2', 'Effect1']
 
+# Same list seen from the building that researches the technique. AssociatedBuilding
+# is dropped - it is the record you are already looking at - and the units the
+# technique benefits are shown instead.
+TECHNIQUE_AT_BUILDING_STATS = ['YangNeeded', 'Cost', 'Time', 'Unit1', 'Unit2',
+                               'Unit3', 'Unit4', 'AbilityAffected1',
+                               'AbilityAffected2', 'Effect1']
+
+UPGRADE_STATS = ['YangNeeded', 'Cost', 'Time', 'Value', 'Class', 'Secret',
+                 'AlternateWeapon', 'Unit1', 'Unit2', 'Unit3', 'Unit4']
+
 
 def _expand(col, target_sheet, subcols):
     """Profile item: show `col`, then the listed columns of the record it names."""
@@ -362,6 +372,83 @@ def _unit_techniques(book, sheet, row):
 _unit_techniques.consumes = [('Data_Techniques', f'Unit{i}') for i in range(1, 5)]
 
 
+def _researched_here(book, sheet, row, other, stats, empty):
+    """Rows of `other` whose AssociatedBuilding is this building."""
+    code = book.value(sheet, row, 0)
+    sd = book.sheets.get(other)
+    out = []
+    if sd is None or not isinstance(code, int):
+        return out
+    c_at = _col(book, other, 'AssociatedBuilding')
+    if c_at is None:
+        return out
+    for i in range(len(sd.rows)):
+        if book.value(other, i, c_at) != code:
+            continue
+        out.append(Note(record_title(book, other, i), '', link=(other, i)))
+        for sub in stats:
+            sc = _col(book, other, sub)
+            if sc is not None:
+                out.append(Field(sub, other, i, sc, indent=1))
+    if not out:
+        out.append(Note(empty, ''))
+    return out
+
+
+def _building_research(book, sheet, row):
+    """Techniques and upgrades researched at this building.
+
+    Both sheets point at the building rather than the other way round, so
+    nothing on the building's own row hints that a Tavern researches Darts,
+    Drunken Revelry and Fortified Ale. Not to be confused with the
+    "Upgrades into" section, which is this building turning into another one.
+    """
+    out = _researched_here(book, sheet, row, 'Data_Techniques',
+                           TECHNIQUE_AT_BUILDING_STATS,
+                           'No techniques researched here')
+    out += _researched_here(book, sheet, row, 'Data_Upgrades', UPGRADE_STATS,
+                            'No upgrades researched here')
+    return out
+
+
+_building_research.consumes = [('Data_Techniques', 'AssociatedBuilding'),
+                               ('Data_Upgrades', 'AssociatedBuilding')]
+
+
+def _building_prereqs(book, sheet, row):
+    """What has to exist before this building can be placed.
+
+    Lives in Data_BuildingTechTree, keyed by the building itself, so the generic
+    reverse-reference scan could only ever label it with this building's own name.
+    """
+    code = book.value(sheet, row, 0)
+    tree = 'Data_BuildingTechTree'
+    sd = book.sheets.get(tree)
+    out = []
+    if sd is None or not isinstance(code, int):
+        return out
+    trow = _find_row(book, tree, code)
+    if trow is None:
+        out.append(Note('Not listed in the building tech tree', ''))
+        return out
+    for slot in range(1, 5):
+        c = _col(book, tree, f'Prerequisite{slot}')
+        if c is None:
+            continue
+        f = Field(f'Prerequisite{slot}', tree, trow, c)
+        v = book.value(tree, trow, c)
+        brow = _find_row(book, 'Data_Buildings', v) if v not in (None, -1) else None
+        if brow is not None:
+            f.link = ('Data_Buildings', brow)
+        out.append(f)
+    if not out:
+        out.append(Note('No prerequisites', ''))
+    return out
+
+
+_building_prereqs.consumes = [('Data_BuildingTechTree', 'Type')]
+
+
 def _weapon_wielders(book, sheet, row):
     """Units that carry this weapon."""
     code = book.value(sheet, row, 0)
@@ -440,9 +527,15 @@ PROFILES = {
                      'FireExtinguishPoint', 'FireConsumePoint', 'LOS',
                      'AMCutting', 'AMPiercing', 'AMBlunt', 'AMFire',
                      'AMExplosive', 'AMMagical', 'Destroyable']),
+        ('Requires', _building_prereqs),
         ('Trains', _building_training),
         ('Training cost', ['RiceTrainCost', 'WaterTrainCost']),
-        ('Upgrades to', ['UpgradeToType', 'UpgradeToRate', 'UpgradeRiceCost',
+        ('Researched here', _building_research),
+        # Named "into" on purpose: this is the building turning into another
+        # building, not the techniques and upgrades you research at it. Those
+        # are in "Researched here" above.
+        ('Upgrades into another building',
+         ['UpgradeToType', 'UpgradeToRate', 'UpgradeRiceCost',
                          'UpgradeWaterCost', 'UpgradeRiceRefund',
                          'UpgradeWaterRefund', 'UnlocksBuildingType',
                          'NumOfBuildingsUnlocked']),

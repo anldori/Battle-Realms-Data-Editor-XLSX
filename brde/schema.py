@@ -45,6 +45,7 @@ EXPLICIT_RULES = [
     (r'^AffectSpecificUnitType\d*$', 'UnitType'),
     (r'^UpgradeToType$', 'BuildingType'),
     (r'^(Building|TrainBuilding)(Required|Type)\d*$', 'BuildingType'),
+    (r'^Prerequisite\d*$', 'BuildingType'),
     (r'^BuildingAttachmentFlag$', 'BuildingAttachmentType'),
     (r'^WeaponSlot', 'WeaponSlotType'),
     (r'^DamageEffect', 'EffectType'),
