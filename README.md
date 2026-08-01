@@ -160,6 +160,21 @@ from `CHANGELOG` in `brde/about.py`.
   properly are no longer repeated at the bottom of the page under a worse label.
   References into the same sheet through a different column are still listed.
 - Techniques now name the ability they change instead of showing a bare code number.
+- **Weapon and upgrade classes were reading from the wrong code table.** A weapon's
+  `Class` showed `OBJECTCLASS_WATER` when it means `WEAPONCLASS_PROJECTILE`, and an
+  upgrade's showed the same plant / stone / water table instead of offensive /
+  defensive / misc.
+- **Ten yes/no switches had become dropdowns of the wrong thing.** Columns such as
+  `CreateUnit`, `RemoveEnemyUpgrade` and `AIAlwaysAddUnit` end in a word that names a
+  code table, so they were offering a list of units or upgrades where the answer is
+  only yes or no. The real reference sits in the column beside them, and those were
+  never touched: `CreatedUnitType`, `SetWeapon` and `UpgradeUnit` still resolve
+  normally.
+- **Technique effects were reading from the wrong code table.**
+  `TECHNIQUE_DRAGONS_STRENGTH` showed `EFFECT_BALLISTAMAN_TOTEM_IMPACT` when the code
+  means `TE_WP_MULT_DAMAGE` - multiply weapon damage, by the factor beside it. Effect
+  columns in `Data_Techniques` now read `Enum_TechniqueEffectType`, and each one is
+  shown next to the `FloatParam` it scales by, so the pair reads as one statement.
 - **Buildings show what they research.** A tavern or a dojo never listed its
   techniques and upgrades, because those sheets point at the building rather than the
   other way round. There is now a "Researched here" section with the cost, time and

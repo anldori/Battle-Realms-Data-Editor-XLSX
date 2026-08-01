@@ -150,15 +150,23 @@ BATTLE_GEAR_STATS = ['RiceCost', 'WaterCost', 'Time', 'AcquisitionType']
 
 SPELL_STATS = ['Range', 'StaminaCost', 'MinStamina', 'TargetEffect', 'AnimState']
 
+# Effect1..3 are each followed by the number they scale by, so the pair reads as
+# one statement: TE_WP_MULT_DAMAGE with FloatParam1 = 1.4 means "weapon damage
+# x1.4". Effect4 exists in the sheet but no technique in the vanilla file uses
+# it, so it stays in "Other fields" rather than adding two dead lines to every
+# technique. Effect3 is used by four of them.
+TECHNIQUE_EFFECTS = ['Effect1', 'FloatParam1', 'Effect2', 'FloatParam2',
+                     'Effect3', 'FloatParam3']
+
 TECHNIQUE_STATS = ['YangNeeded', 'Cost', 'Time', 'AssociatedBuilding',
-                   'AbilityAffected1', 'AbilityAffected2', 'Effect1']
+                   'AbilityAffected1', 'AbilityAffected2'] + TECHNIQUE_EFFECTS
 
 # Same list seen from the building that researches the technique. AssociatedBuilding
 # is dropped - it is the record you are already looking at - and the units the
 # technique benefits are shown instead.
 TECHNIQUE_AT_BUILDING_STATS = ['YangNeeded', 'Cost', 'Time', 'Unit1', 'Unit2',
                                'Unit3', 'Unit4', 'AbilityAffected1',
-                               'AbilityAffected2', 'Effect1']
+                               'AbilityAffected2'] + TECHNIQUE_EFFECTS
 
 UPGRADE_STATS = ['YangNeeded', 'Cost', 'Time', 'Value', 'Class', 'Secret',
                  'AlternateWeapon', 'Unit1', 'Unit2', 'Unit3', 'Unit4']

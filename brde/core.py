@@ -61,7 +61,12 @@ class EnumTable:
         return f'{code} - {d}' if d else str(code)
 
 
-BOOL_TABLE = EnumTable('@bool', [(0, 'No (0)', ''), (1, 'Yes (1)', '')])
+# -1 is the workbook's usual "none / invalid", and a few switches use it instead
+# of 0. It is listed so those cells read as "-1 - None" rather than being flagged
+# red as a code missing from the table. No column in the vanilla file uses -1 and
+# 0 and 1 together, so the extra entry costs nothing.
+BOOL_TABLE = EnumTable('@bool', [(-1, 'None (-1)', ''),
+                                 (0, 'No (0)', ''), (1, 'Yes (1)', '')])
 
 
 class SheetData:

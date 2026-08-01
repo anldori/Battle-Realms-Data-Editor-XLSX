@@ -32,6 +32,10 @@ NUMERIC_PATTERNS = [
     r'^(X|Y|Z|U|V)$',
     r'(LOD|FPS|MS)$',
     r'^(Duration|Lifetime|Cooldown|Recharge|Threshold|Elapsed|Interval|Spread)',
+    # A parameter is the number an effect scales by, never a code. Without this,
+    # Data_Techniques.FloatParam4 and LongParam2 happen to hold nothing but 0 and
+    # 1 and fall through to the yes/no dropdown at the end.
+    r'Param\d*$',
 ]
 NUMERIC_RE = [re.compile(p) for p in NUMERIC_PATTERNS]
 
@@ -96,14 +100,67 @@ EXPLICIT_RULES = [
 ]
 EXPLICIT_RE = [(re.compile(p, re.I), e) for p, e in EXPLICIT_RULES]
 
+# Rules that apply inside one sheet only, and beat the global ones above.
+#
+# Needed where a column name is generic enough to hit a global rule that is
+# wrong for that particular sheet. `Data_Techniques.Effect1` matches the
+# '^Effect' rule and lands in Enum_EffectType, the particle effect table, so
+# TECHNIQUE_DRAGONS_STRENGTH reads "EFFECT_BALLISTAMAN_TOTEM_IMPACT" when the
+# code actually means TE_WP_MULT_DAMAGE in Enum_TechniqueEffectType - multiply
+# weapon damage, by the factor in the FloatParam column beside it.
+#
+# The coverage check cannot catch this on its own: both enums contain every
+# small integer these columns hold, so the data agrees with either answer and
+# the sheet has to say which table it means. Entries here are still coverage
+# checked like any other rule.
+SHEET_RULES = {
+    'Data_Techniques': [(r'^Effect\d*$', 'TechniqueEffectType')],
+    # '^Class$' sends every Class column to ObjectClassType, the plant/stone/water
+    # table. A weapon's class is instant hit / melee / projectile, and an
+    # upgrade's is offensive / defensive / misc.
+    'Data_Weapons': [(r'^Class$', 'WeaponClassType')],
+    'Data_Upgrades': [(r'^Class$', 'TechniqueClass')],
+}
+SHEET_RE = {s: [(re.compile(p, re.I), e) for p, e in rules]
+            for s, rules in SHEET_RULES.items()}
+
 # Columns whose name reads as a yes/no question. Checked before name matching,
 # because a trailing noun otherwise drags them into the wrong enum: 'IsFireWeapon'
 # ends in 'Weapon' and its 0/1 values happen to be valid WeaponType codes, so it
 # would be shown as 'WEAPON_ARAH_ARROW'. Only applied when the column really does
 # hold nothing but 0 and 1.
 BOOL_PREFIX_RE = re.compile(
-    r'^(Is|Can|Has|Should|Allow|Allows|Use|Uses|Enable|Enables|Prefers|Affects|'
-    r'Only|Always|Never|No)[A-Z]')
+    r'^(AI)?(Is|Can|Has|Should|Allow|Allows|Use|Uses|Enable|Enables|Prefers|'
+    r'Affects|Only|Always|Never|No)[A-Z]')
+
+# Yes/no columns whose name gives no usable hint, listed by hand per sheet.
+#
+# Same trap as IsFireWeapon above, but the phrasing test cannot catch these: the
+# name is a verb phrase ending in a noun that happens to be an enum, so
+# CreateUnit lands in UnitType and RemoveEnemyUpgrade in UpgradeType. A generic
+# "verb prefix means boolean" rule is not safe here - in this very sheet
+# SetWeapon really does hold weapon codes, UpgradeUnit really does hold unit
+# codes and CreateMagicAtTarget really does hold magic object codes. Only the
+# 0/1 range tells them apart in the vanilla file, and a mod that narrows one of
+# those columns to codes 0 and 1 would then be misread. So they are named
+# explicitly instead of guessed.
+#
+# The giveaway for most of these is a sibling column holding the real reference:
+# CreateUnit is the switch, CreatedUnitType is the unit; ParticleEffectAtSource
+# is the effect, ParticleEffectFollowsSource is whether it tracks the caster.
+BOOL_COLUMNS = {
+    'Data_Abilities': {
+        'ParticleEffectFollowsSource',
+        'ParticleEffectFollowsAffectedItem',
+        'CreateUnit',
+        'DisableRunAbility',
+        'RemoveEnemyUpgrade',
+        'GiveAbilityToUnit',
+        'RedirectDamageFromSourceToTarget',
+        'RedirectStaminaUsedFromSourceToTarget',
+    },
+    'Data_Spells': {'TargetTypeIsObject'},
+}
 
 # Armour multipliers. Floats in Data_Units, but Data_Buildings stores whole
 # numbers, which would otherwise be mistaken for a yes/no column.
@@ -111,7 +168,8 @@ ARMOR_RE = re.compile(r'^AM(Cutting|Piercing|Blunt|Fire|Explosive|Magical)$')
 
 # Marker used in place of an enum name for boolean (0/1) columns.
 BOOL_ENUM = '@bool'
-BOOL_ITEMS = [(0, 'No / False (0)'), (1, 'Yes / True (1)')]
+BOOL_ITEMS = [(-1, 'None / invalid (-1)'), (0, 'No / False (0)'),
+              (1, 'Yes / True (1)')]
 
 # Data_* sheet -> the enum that defines its own primary key (the 'Type' column).
 # Only needed where the sheet name does not map to an enum name directly.
@@ -244,7 +302,8 @@ def infer_column_enum(sheet: str, col: str, values, enums: dict, self_enum=None)
     name that merely looks right is rejected when the data disagrees. The
     coverage check alone is not enough for small code ranges, though: a 0/1
     column passes against almost any enum, which is why the yes/no phrasing test
-    runs before name matching.
+    runs before name matching, and two enums covering the same small integers
+    are indistinguishable by data alone, which is what SHEET_RULES is for.
     """
     if not values:
         return None
@@ -259,27 +318,37 @@ def infer_column_enum(sheet: str, col: str, values, enums: dict, self_enum=None)
     if ARMOR_RE.match(colname):
         return None
 
-    # 3. yes/no phrasing wins over any name match, but only if the data agrees
+    # 3. yes/no, by phrasing or by name, but only if the data agrees.
+    #    The hand-listed columns also accept -1 as "none", which some of the
+    #    ability switches use; phrasing alone stays on the stricter 0/1 test.
     if BOOL_PREFIX_RE.match(colname) and sv <= {0, 1}:
         return BOOL_ENUM
+    if colname in BOOL_COLUMNS.get(sheet, ()) and sv <= {-1, 0, 1}:
+        return BOOL_ENUM
 
-    # 4. hand-written rules
+    # 4. sheet-scoped rules, which beat the global ones below
+    for rx, ename in SHEET_RE.get(sheet, ()):
+        if rx.search(colname) and ename in enums:
+            if sv <= enums[ename] | {-1}:
+                return ename
+
+    # 5. hand-written rules
     for rx, ename in EXPLICIT_RE:
         if rx.search(colname) and ename in enums:
             if sv <= enums[ename] | {-1}:
                 return ename
 
-    # 5. numeric blacklist
+    # 6. numeric blacklist
     if any(rx.search(colname) for rx in NUMERIC_RE):
         return None
 
-    # 6. name matching + coverage check
+    # 7. name matching + coverage check
     sheet_base = sheet.split('_', 1)[1] if '_' in sheet else sheet
     for cand in _name_candidates(colname, sheet_base, enums):
         if sv <= enums[cand] | {-1}:
             return cand
 
-    # 7. boolean: only 0/1 present -> Yes/No dropdown (other values still typable)
+    # 8. boolean: only 0/1 present -> Yes/No dropdown (other values still typable)
     if sv <= {0, 1}:
         return BOOL_ENUM
     return None
