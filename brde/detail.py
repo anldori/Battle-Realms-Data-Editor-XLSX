@@ -135,6 +135,24 @@ WEAPON_STATS = ['BaseDamage', 'StaminaDamage', 'DamageClass', 'MinRange',
                 'RiderPercentage', 'PoisonDamage', 'PoisonTime',
                 'HealthVampirePercentage', 'AssociatedProjectile']
 
+# Sub-columns pulled in from Data_Abilities when an ability is expanded.
+# That sheet is 175 columns wide and almost all of them are switches meaningful
+# to one single ability, so the page shows a curated set: what kind of ability
+# it is, what it costs, how long it lasts. Double-click the heading to open the
+# full record. UsageType is the one to read first - USAGETYPE_OMNIPRESENT means
+# the ability is passive, it is always on and has no button.
+ABILITY_STATS = ['UsageType', 'Toggleable', 'LimitedCharges', 'TargetRange',
+                 'Range', 'Delay', 'DurationOfEffect', 'ChanceOfOccuring',
+                 'MinStaminaRequired', 'StaminaCost', 'HealthCost', 'YinCost',
+                 'YangCost']
+
+BATTLE_GEAR_STATS = ['RiceCost', 'WaterCost', 'Time', 'AcquisitionType']
+
+SPELL_STATS = ['Range', 'StaminaCost', 'MinStamina', 'TargetEffect', 'AnimState']
+
+TECHNIQUE_STATS = ['YangNeeded', 'Cost', 'Time', 'AssociatedBuilding',
+                   'AbilityAffected1', 'AbilityAffected2', 'Effect1']
+
 
 def _expand(col, target_sheet, subcols):
     """Profile item: show `col`, then the listed columns of the record it names."""
@@ -169,6 +187,9 @@ def _units_trained_at(book, sheet, row):
     return out
 
 
+_units_trained_at.consumes = [('Data_Buildings', f'UnitOut{i}') for i in range(1, 7)]
+
+
 def _building_training(book, sheet, row):
     """The six UnitIn/UnitOut training slots, skipping the empty ones."""
     out = []
@@ -191,6 +212,156 @@ def _building_training(book, sheet, row):
     return out
 
 
+def _ability_block(book, code, indent=0):
+    """The curated stats of one ability. Returns (items, row in Data_Abilities).
+
+    The row comes back so the caller can point its own heading line at the full
+    record, which is what makes double-clicking the heading open Data_Abilities.
+    """
+    if code in (None, -1):
+        return [], None
+    arow = _find_row(book, 'Data_Abilities', code)
+    if arow is None:
+        return [Note('Not defined in Data_Abilities', '', indent=indent)], None
+    out = []
+    c = _col(book, 'Data_Abilities', 'ActualAbility')
+    if c is not None:
+        out.append(Field('Name', 'Data_Abilities', arow, c, indent=indent))
+    for sub in ABILITY_STATS:
+        sc = _col(book, 'Data_Abilities', sub)
+        if sc is not None:
+            out.append(Field(sub, 'Data_Abilities', arow, sc, indent=indent))
+    return out, arow
+
+
+def _unit_abilities(book, sheet, row):
+    """Innate abilities, read from the Data_UnitAndInnateAbilities join sheet.
+
+    Data_Units has no ability column at all - the link lives in a separate
+    two-column sheet - which is why an ability such as the Dragon Samurai's
+    Seppuku is invisible on the unit's own row.
+    """
+    join = 'Data_UnitAndInnateAbilities'
+    sd = book.sheets.get(join)
+    code = book.value(sheet, row, 0)
+    out = []
+    if sd is None or not isinstance(code, int):
+        return out
+    c_unit = _col(book, join, 'UnitType')
+    c_ab = _col(book, join, 'AbilityType')
+    if c_unit is None or c_ab is None:
+        return out
+    n = 0
+    for i in range(len(sd.rows)):
+        if book.value(join, i, c_unit) != code:
+            continue
+        n += 1
+        f = Field(f'Innate ability {n}', join, i, c_ab)
+        stats, arow = _ability_block(book, book.value(join, i, c_ab), indent=1)
+        if arow is not None:
+            f.link = ('Data_Abilities', arow)
+        out.append(f)
+        out.extend(stats)
+    if not out:
+        out.append(Note('No innate abilities', ''))
+    return out
+
+
+_unit_abilities.consumes = [('Data_UnitAndInnateAbilities', 'UnitType')]
+
+
+def _unit_battle_gear(book, sheet, row):
+    """The battle gear slots, each expanded into the ability it grants.
+
+    A unit names a gear code; the ability behind it is two sheets away, through
+    Data_BattleGear.AbilityType into Data_Abilities.
+    """
+    out = []
+    for name in ('BattleGear1', 'BattleGear2', 'BattleGear3', 'DefaultBattleGear'):
+        c = _col(book, sheet, name)
+        if c is None:
+            continue
+        f = Field(name, sheet, row, c)
+        code = book.value(sheet, row, c)
+        grow = _find_row(book, 'Data_BattleGear', code) \
+            if code not in (None, -1) else None
+        if grow is not None:
+            f.link = ('Data_BattleGear', grow)
+        out.append(f)
+        if grow is None:
+            continue
+        for sub in BATTLE_GEAR_STATS:
+            sc = _col(book, 'Data_BattleGear', sub)
+            if sc is not None:
+                out.append(Field(sub, 'Data_BattleGear', grow, sc, indent=1))
+        c_ab = _col(book, 'Data_BattleGear', 'AbilityType')
+        if c_ab is None:
+            continue
+        af = Field('Grants ability', 'Data_BattleGear', grow, c_ab, indent=1)
+        stats, arow = _ability_block(book, book.value('Data_BattleGear', grow, c_ab),
+                                     indent=2)
+        if arow is not None:
+            af.link = ('Data_Abilities', arow)
+        out.append(af)
+        out.extend(stats)
+    if not out:
+        out.append(Note('No battle gear', ''))
+    return out
+
+
+def _unit_spells(book, sheet, row):
+    """Spell1..5, each expanded into its Data_Spells record."""
+    out = []
+    for slot in range(1, 6):
+        c = _col(book, sheet, f'Spell{slot}')
+        if c is None:
+            continue
+        f = Field(f'Spell{slot}', sheet, row, c)
+        code = book.value(sheet, row, c)
+        srow = _find_row(book, 'Data_Spells', code) \
+            if code not in (None, -1) else None
+        if srow is not None:
+            f.link = ('Data_Spells', srow)
+        out.append(f)
+        if srow is None:
+            continue
+        for sub in SPELL_STATS:
+            sc = _col(book, 'Data_Spells', sub)
+            if sc is not None:
+                out.append(Field(sub, 'Data_Spells', srow, sc, indent=1))
+    if not out:
+        out.append(Note('No spells', ''))
+    return out
+
+
+def _unit_techniques(book, sheet, row):
+    """Techniques that name this unit in Unit1..4."""
+    code = book.value(sheet, row, 0)
+    ts = book.sheets.get('Data_Techniques')
+    out = []
+    if ts is None or not isinstance(code, int):
+        return out
+    cols = [(n, _col(book, 'Data_Techniques', n))
+            for n in ('Unit1', 'Unit2', 'Unit3', 'Unit4')]
+    for i in range(len(ts.rows)):
+        slots = [n for n, c in cols
+                 if c is not None and book.value('Data_Techniques', i, c) == code]
+        if not slots:
+            continue
+        out.append(Note(record_title(book, 'Data_Techniques', i), ', '.join(slots),
+                        link=('Data_Techniques', i)))
+        for sub in TECHNIQUE_STATS:
+            sc = _col(book, 'Data_Techniques', sub)
+            if sc is not None:
+                out.append(Field(sub, 'Data_Techniques', i, sc, indent=1))
+    if not out:
+        out.append(Note('No techniques affect this unit', ''))
+    return out
+
+
+_unit_techniques.consumes = [('Data_Techniques', f'Unit{i}') for i in range(1, 5)]
+
+
 def _weapon_wielders(book, sheet, row):
     """Units that carry this weapon."""
     code = book.value(sheet, row, 0)
@@ -209,6 +380,11 @@ def _weapon_wielders(book, sheet, row):
     if not out:
         out.append(Note('Not carried by any unit', ''))
     return out
+
+
+_weapon_wielders.consumes = [('Data_Units', n) for n in
+                             ('MeleeWeapon', 'MissileWeapon', 'PrimaryWeapon',
+                              'SecondaryWeapon')]
 
 
 PROFILES = {
@@ -240,9 +416,10 @@ PROFILES = {
                     'EncroachmentRange', 'FightOrFlightRange',
                     'YangScore', 'YinScore', 'DeathYinYangAwarded',
                     'YinYangDamageIncrementor']),
-        ('Battle gear', ['BattleGear1', 'BattleGear2', 'BattleGear3',
-                         'DefaultBattleGear']),
-        ('Spells', ['Spell1', 'Spell2', 'Spell3', 'Spell4', 'Spell5']),
+        ('Abilities', _unit_abilities),
+        ('Battle gear', _unit_battle_gear),
+        ('Spells', _unit_spells),
+        ('Techniques', _unit_techniques),
         ('Movement', ['Mount', 'UsePackHorse', 'AscendHillMultiplier',
                       'DescendHillMultiplier', 'DirtSpeedMultiplier',
                       'ForestSpeedMultiplier', 'GrassSpeedMultiplier',
@@ -311,8 +488,17 @@ def _reverse_refs(book):
     return out
 
 
-def _referenced_by(book, sheet, row, skip_sheets=()):
-    """Rows elsewhere that point at this record."""
+def _referenced_by(book, sheet, row, skip_sheets=(), skip_pairs=()):
+    """Rows elsewhere that point at this record.
+
+    `skip_pairs` holds the (sheet, column) joins a curated section already laid
+    out properly. Without it the same rows appear twice, and the second copy is
+    the useless one: a join sheet such as Data_UnitAndInnateAbilities is titled
+    by its first column, so the Samurai's ability row would read "UNIT_D_SAMURAI"
+    rather than naming the ability. The skip is per column, not per sheet, so
+    other references into the same sheet - Data_Buildings.UnitIn, UnitToDock -
+    are still listed.
+    """
     sd = book.sheets[sheet]
     code = book.value(sheet, row, 0)
     items = []
@@ -321,7 +507,7 @@ def _referenced_by(book, sheet, row, skip_sheets=()):
     for other, col in _reverse_refs(book).get(sd.self_enum, []):
         if other == sheet and col == 0:
             continue          # the record's own key column
-        if other in skip_sheets:
+        if other in skip_sheets or (other, col) in skip_pairs:
             continue
         osd = book.sheets[other]
         hits = [i for i in range(len(osd.rows))
@@ -349,6 +535,9 @@ def build_sections(book, sheet, row):
     # name the same weapon twice - PrimaryWeapon and MissileWeapon both point at
     # the bow - and printing its stats a second time is just noise.
     expanded = {}
+    # (sheet, col) joins a curated section has already listed, so "Referenced by"
+    # does not print them a second time under a worse label.
+    consumed = set()
 
     def field(name, indent=0):
         c = _col(book, sheet, name)
@@ -366,6 +555,10 @@ def build_sections(book, sheet, row):
             for it in items:
                 if isinstance(it, Field) and it.sheet == sheet and it.row == row:
                     used.add(it.col)
+            for other, header in getattr(spec, 'consumes', ()):
+                oc = _col(book, other, header)
+                if oc is not None:
+                    consumed.add((other, oc))
         else:
             for entry in spec:
                 if isinstance(entry, str):
@@ -418,7 +611,8 @@ def build_sections(book, sheet, row):
                                 else 'Fields', rest))
 
     sections.append(Section('Referenced by',
-                            _referenced_by(book, sheet, row, expanded_sheets)))
+                            _referenced_by(book, sheet, row, expanded_sheets,
+                                           consumed)))
     return sections
 
 

@@ -72,6 +72,7 @@ EXPLICIT_RULES = [
     (r'^Model\d*$', 'ModelType'),
     (r'^Texture\d*$', 'TextureType'),
     (r'^Button\d*$', 'ButtonType'),
+    (r'^AbilityAffected\d*$', 'AbilityType'),
     (r'^Ability\d*$', 'AbilityType'),
     (r'^Upgrade\d*$', 'UpgradeType'),
     (r'^Technique\d*$', 'TechniqueType'),

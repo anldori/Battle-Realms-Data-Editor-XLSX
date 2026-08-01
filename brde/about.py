@@ -19,7 +19,22 @@ TAGLINE = ('Editor for Battle Realms game data in the newer Battle Realms.xlsx '
 
 # (version, when, [changes]) - newest first.
 CHANGELOG = [
-    ('1.1.0', 'current', [
+    ('1.1.1', 'current', [
+        '<b>Abilities on the record page.</b> A unit\'s abilities were missing, '
+        'because <code>Data_Units</code> has no ability column at all - the link '
+        'runs through a separate join sheet. The page now follows it, and shows '
+        'innate abilities, the ability each piece of battle gear grants, spells, '
+        'and the techniques that affect the unit, each with its name and key '
+        'stats and editable in place. The Dragon Samurai gets its Seppuku, '
+        'Dragon Skin and Yang Blade.',
+        '<b>Less noise under "Referenced by".</b> Rows a curated section has '
+        'already laid out properly are no longer repeated at the bottom of the '
+        'page under a worse label. References into the same sheet through a '
+        'different column are still listed.',
+        'Techniques now name the ability they change instead of showing a bare '
+        'code number.',
+    ]),
+    ('1.1.0', '', [
         '<b>Compare two files.</b> Diff your mod against vanilla, or two '
         'versions of your own work. Rows are matched by their Type key rather '
         'than by position, so inserting a record no longer reports every row '

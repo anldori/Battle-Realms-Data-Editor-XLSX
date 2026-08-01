@@ -148,7 +148,20 @@ differences; the tool warns you about this before it starts.
 Also shown in **Help ▸ About**, which is the authoritative copy - it is generated
 from `CHANGELOG` in `brde/about.py`.
 
-**1.1.0** (current)
+**1.1.1** (current)
+
+- **Abilities on the record page.** A unit's abilities were missing, because
+  `Data_Units` has no ability column at all - the link runs through a separate join
+  sheet. The page now follows it, and shows innate abilities, the ability each piece
+  of battle gear grants, spells, and the techniques that affect the unit, each with
+  its name and key stats and editable in place. The Dragon Samurai gets its Seppuku,
+  Dragon Skin and Yang Blade.
+- **Less noise under "Referenced by".** Rows a curated section has already laid out
+  properly are no longer repeated at the bottom of the page under a worse label.
+  References into the same sheet through a different column are still listed.
+- Techniques now name the ability they change instead of showing a bare code number.
+
+**1.1.0**
 
 - **Compare two files.** Diff your mod against vanilla, or two versions of your own
   work. Rows are matched by their `Type` key rather than by position, differences can
