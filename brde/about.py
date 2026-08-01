@@ -33,6 +33,12 @@ CHANGELOG = [
         'different column are still listed.',
         'Techniques now name the ability they change instead of showing a bare '
         'code number.',
+        '<b>Battle gear columns showed bare numbers.</b> A hero\'s '
+        'DefaultBattleGear read "82" instead of naming the gear, and the gear '
+        'combination columns had no dropdown at all. Hero Arah now shows '
+        'BATTLE_GEAR_HERO_ARAH_ZEN_ARROWS and the ability behind it, Sight '
+        'Beyond Sight. The unit page also lists the gear combinations that '
+        'belong to the unit.',
         '<b>Weapon and upgrade classes were reading from the wrong code '
         'table.</b> A weapon\'s Class showed OBJECTCLASS_WATER when it means '
         'WEAPONCLASS_PROJECTILE, and an upgrade\'s showed the same plant / '

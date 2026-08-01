@@ -160,6 +160,11 @@ from `CHANGELOG` in `brde/about.py`.
   properly are no longer repeated at the bottom of the page under a worse label.
   References into the same sheet through a different column are still listed.
 - Techniques now name the ability they change instead of showing a bare code number.
+- **Battle gear columns showed bare numbers.** A hero's `DefaultBattleGear` read
+  `82` instead of naming the gear, and the gear combination columns had no dropdown
+  at all. Hero Arah now shows `BATTLE_GEAR_HERO_ARAH_ZEN_ARROWS` and the ability
+  behind it, Sight Beyond Sight. The unit page also lists the gear combinations that
+  belong to the unit.
 - **Weapon and upgrade classes were reading from the wrong code table.** A weapon's
   `Class` showed `OBJECTCLASS_WATER` when it means `WEAPONCLASS_PROJECTILE`, and an
   upgrade's showed the same plant / stone / water table instead of offensive /

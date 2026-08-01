@@ -322,9 +322,37 @@ def _unit_battle_gear(book, sheet, row):
             af.link = ('Data_Abilities', arow)
         out.append(af)
         out.extend(stats)
+    out += _unit_gear_combos(book, sheet, row)
     if not out:
         out.append(Note('No battle gear', ''))
     return out
+
+
+def _unit_gear_combos(book, sheet, row):
+    """The unit's entry in Data_UnitToUnitAndBattleGear.
+
+    One row per unit naming the unit-and-gear combinations it can appear as,
+    which is what the model and attachment tables key off. Shown here so it does
+    not fall to "Referenced by", where the row would be titled with this unit's
+    own name and say nothing.
+    """
+    join = 'Data_UnitToUnitAndBattleGear'
+    sd = book.sheets.get(join)
+    code = book.value(sheet, row, 0)
+    if sd is None or not isinstance(code, int):
+        return []
+    jrow = _find_row(book, join, code)
+    if jrow is None:
+        return []
+    out = [Note('Gear combinations', '', link=(join, jrow))]
+    for name in ('BattleGearNone', 'BattleGear1', 'BattleGear2', 'BattleGear3'):
+        c = _col(book, join, name)
+        if c is not None:
+            out.append(Field(name, join, jrow, c, indent=1))
+    return out
+
+
+_unit_battle_gear.consumes = [('Data_UnitToUnitAndBattleGear', 'Type')]
 
 
 def _unit_spells(book, sheet, row):

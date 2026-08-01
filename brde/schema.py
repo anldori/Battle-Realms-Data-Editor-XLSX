@@ -120,6 +120,18 @@ SHEET_RULES = {
     # upgrade's is offensive / defensive / misc.
     'Data_Weapons': [(r'^Class$', 'WeaponClassType')],
     'Data_Upgrades': [(r'^Class$', 'TechniqueClass')],
+    # The numeric blacklist swallows anything starting with Default, so this
+    # never reached the name matching that would have found the right table and
+    # a hero's default gear showed as a bare number.
+    'Data_Units': [(r'^DefaultBattleGear$', 'BattleGearType')],
+    # These name a unit-and-gear combination, not a piece of gear: the values
+    # run past the end of Enum_BattleGearType, which is why they ended up with
+    # no dropdown at all. Proof that the row belongs to a unit rather than to a
+    # combination: on the Dragon Samurai's row, BattleGearNone is
+    # UNITBG_D_SAMURAI_NONE, and across the sheet 445 of these point back at
+    # exactly the unit named in the row's own Type column.
+    'Data_UnitToUnitAndBattleGear': [
+        (r'^BattleGear(None|\d*)$', 'UnitAndBattleGearType')],
 }
 SHEET_RE = {s: [(re.compile(p, re.I), e) for p, e in rules]
             for s, rules in SHEET_RULES.items()}
@@ -176,7 +188,10 @@ BOOL_ITEMS = [(-1, 'None / invalid (-1)'), (0, 'No / False (0)'),
 SHEET_SELF_OVERRIDE = {
     'Data_BattleGear': 'BattleGearType',
     'Data_UnitAndBattleGear': 'UnitAndBattleGearType',
-    'Data_UnitToUnitAndBattleGear': 'UnitAndBattleGearType',
+    # One row per unit, listing that unit's gear combinations, so the key is the
+    # unit. Reading it as a combination made the row title name a different
+    # unit's gear entirely.
+    'Data_UnitToUnitAndBattleGear': 'UnitType',
     'Data_MAXJointProperties': 'MAXJointProperties',
     'Data_MAXTriangleProperties': 'MAXTriangleProperties',
     'Data_TeamColors': 'TeamColors',
