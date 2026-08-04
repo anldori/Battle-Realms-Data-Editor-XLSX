@@ -19,7 +19,33 @@ TAGLINE = ('Editor for Battle Realms game data in the newer Battle Realms.xlsx '
 
 # (version, when, [changes]) - newest first.
 CHANGELOG = [
-    ('1.1.1', 'current', [
+    ('1.2.0', 'current', [
+        '<b>Compare two units.</b> Compare &gt; Compare units... (Ctrl+U) puts '
+        'two units in two columns - cost, health, all six armour multipliers, '
+        'and every weapon with its damage class and damage - and says which '
+        'one beats which.',
+        '<b>The counter is spelled out rather than left to be worked out.</b> '
+        'An armour multiplier scales the damage a unit takes, so above 1 is a '
+        'weakness and below 1 is resistance, which reads backwards from armour '
+        'in most games. "Counter matchup" runs each unit\'s weapons against '
+        'the other\'s armour and gives the damage landed and the hits to kill, '
+        'and a sentence at the top names the winner: the Dragon Spearman\'s '
+        'AMPiercing of 4.0 means a Samurai arrow lands 104 damage and kills in '
+        'three hits, against 120 hits coming back.',
+        '<b>Upgraded units, not paper ones.</b> Health, armour and weapon '
+        'damage all move once techniques are researched, so comparing the raw '
+        'sheet values describes units nobody ever fields. "Apply techniques" '
+        'recomputes both sides fully upgraded and shows every value a '
+        'technique moved as "base -&gt; upgraded". Ten placeholder rows in '
+        'Data_Techniques that each multiply the Dragon Archer\'s damage by 1.4 '
+        'are left out: nothing researches them, and stacked they would turn an '
+        '18 damage arrow into 730.',
+        'Green means good for the unit in that column and red means bad for '
+        'it, in the armour rows and the matchup rows alike.',
+        'The comparison exports to CSV, follows edits live, and right-clicking '
+        'a row in Data_Units loads that unit straight into it.',
+    ]),
+    ('1.1.1', '', [
         '<b>Abilities on the record page.</b> A unit\'s abilities were missing, '
         'because <code>Data_Units</code> has no ability column at all - the link '
         'runs through a separate join sheet. The page now follows it, and shows '

@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QFileDialog, QHeaderView,
                              QSplitter, QStackedWidget, QStatusBar, QTableView,
                              QToolBar, QVBoxLayout, QWidget)
 
-from . import about, compare, core, detail
+from . import about, compare, core, detail, matchup, matchup_ui
 from .model import (EnumDelegate, MultiSetCommand, RowFilter, SetValueCommand,
                     SheetModel, coerce)
 
@@ -85,6 +85,7 @@ KEYBOARD SHORTCUTS
   Ctrl+F  filter rows         Ctrl+P  go to sheet
   Ctrl+E  list edited cells   Ctrl+Shift+N  add row
   Ctrl+I  find a record       Ctrl+Shift+I  details for the selected row
+  Ctrl+U  compare two units   Ctrl+Shift+U  compare the selected unit
 
 RECORD DETAILS  (Record > Find record..., Ctrl+I)
   Type a unit or building name - "samurai", "dojo" - and pick it from the list.
@@ -111,6 +112,19 @@ COMPARING TWO FILES
   "Export to CSV..." saves the whole report.
   Rows are matched by their Type key, not by position, so inserting a
   record does not make every row below it look changed.
+
+COMPARING TWO UNITS  (Compare > Compare units..., Ctrl+U)
+  Pick two units and read their stats in two columns: cost, health, the six
+  armour multipliers, and every weapon with its damage class and damage.
+  A unit's armour multiplier SCALES THE DAMAGE IT TAKES, so above 1 is a
+  weakness and below 1 is resistance. The Dragon Spearman's AMPiercing of 4
+  is why archers cut it down.
+  "Counter matchup" puts each unit's weapons against the other's armour and
+  works out damage landed and hits to kill, and a sentence at the top names
+  the winner. Green is good for the unit in that column, red is bad for it.
+  "Apply techniques" recomputes everything as fully upgraded; values a
+  technique moves are shown as "base -> upgraded".
+  Ctrl+Shift+U, or right-clicking a row in Data_Units, loads that unit.
 
 SAVING
   Ctrl+S overwrites the open file and creates a timestamped .bak copy first.
@@ -145,6 +159,7 @@ class MainWindow(QMainWindow):
         self._compare_dlg = None
         self._compare_result = None
         self._detail_dlg = None
+        self._matchup_dlg = None
 
         self._build_ui()
         self.setAcceptDrops(True)
@@ -191,6 +206,12 @@ class MainWindow(QMainWindow):
         self.a_compare = mkact('&Compare with another file...', self.on_compare,
                                'Ctrl+D',
                                'Pick a second .xlsx and list every difference')
+        self.a_matchup = mkact(
+            'Compare &units...', self.on_matchup, 'Ctrl+U',
+            'Put two units side by side and see which one counters which')
+        self.a_matchup_row = mkact(
+            'Compare &this unit with...', self.on_matchup_row, 'Ctrl+Shift+U',
+            'Load the unit under the cursor into the unit comparison')
         self.a_cmp_again = mkact('Compare with &last file again', self.on_compare_last)
         self.a_cmp_show = mkact('&Show last report', self.on_compare_show)
         self.a_cmp_clear = mkact('Cl&ear comparison', self.on_compare_clear,
@@ -244,6 +265,9 @@ class MainWindow(QMainWindow):
         m_cmp.addSeparator()
         m_cmp.addAction(self.a_cmp_show)
         m_cmp.addAction(self.a_cmp_clear)
+        m_cmp.addSeparator()
+        m_cmp.addAction(self.a_matchup)
+        m_cmp.addAction(self.a_matchup_row)
 
         m_help = mb.addMenu('&Help')
         m_help.addAction(self.a_help)
@@ -265,6 +289,7 @@ class MainWindow(QMainWindow):
         tb.addSeparator()
         tb.addAction(self.a_detail)
         tb.addAction(self.a_compare)
+        tb.addAction(self.a_matchup)
         tb.addSeparator()
 
         self.chk_desc = QCheckBox('Show enum descriptions')
@@ -478,7 +503,7 @@ class MainWindow(QMainWindow):
                   self.a_paste, self.a_clear, self.a_revert, self.a_addrow,
                   self.a_edits, self.a_find, self.a_gosheet, self.a_desc,
                   self.a_detail, self.a_detail_row, self.a_compare,
-                  self.a_cmp_again):
+                  self.a_cmp_again, self.a_matchup, self.a_matchup_row):
             a.setEnabled(on)
         # these two only make sense once a comparison has actually been run
         if not on:
@@ -540,6 +565,7 @@ class MainWindow(QMainWindow):
         self._push_recent(path)
         self._discard_comparison()
         self._discard_detail()
+        self._discard_matchup()
         self._models.clear()
         self.undo.clear()
         self._set_file_actions_enabled(True)
@@ -558,6 +584,7 @@ class MainWindow(QMainWindow):
             return
         self._discard_comparison()
         self._discard_detail()
+        self._discard_matchup()
         self.book = None
         self.model = None
         self._models.clear()
@@ -600,6 +627,8 @@ class MainWindow(QMainWindow):
             m.refresh_all()
         if self._detail_dlg is not None:
             self._detail_dlg.refresh()
+        if self._matchup_dlg is not None:
+            self._matchup_dlg.refresh()
         self._update_title()
         self.lbl_status.setText(f'Saved {n} cells to {out}  (.bak backup created)')
 
@@ -672,6 +701,11 @@ class MainWindow(QMainWindow):
         self._update_title()
         if self._detail_dlg is not None:
             self._detail_dlg.refresh()
+        if self._matchup_dlg is not None:
+            # Recomputed from scratch rather than repainted: retuning a weapon's
+            # damage or a unit's armour changes who counters whom, and that
+            # verdict is the whole reason the window is open.
+            self._matchup_dlg.refresh()
 
     def show_sheet(self, name, focus_row=None, focus_col=0):
         self.model = self._model_for(name)
@@ -890,6 +924,51 @@ class MainWindow(QMainWindow):
             return
         self.undo.push(SetValueCommand(model, row, col, old, new))
 
+    # ------------------------------------------------------------- matchup
+    def on_matchup(self):
+        if not self.book:
+            return
+        if self._matchup_dlg is None:
+            d = matchup_ui.MatchupWindow(self.book, self)
+            d.jumpRequested.connect(self._on_detail_jump)
+            d.detailRequested.connect(self._detail_for)
+            d.finished.connect(self._on_matchup_closed)
+            self._matchup_dlg = d
+        self._matchup_dlg.show()
+        self._matchup_dlg.raise_()
+        self._matchup_dlg.activateWindow()
+        return self._matchup_dlg
+
+    def on_matchup_row(self):
+        """Load the unit under the cursor as the first side of the comparison."""
+        if not self.model:
+            return
+        if self.model.sheet != matchup.UNIT_SHEET:
+            self.lbl_status.setText(
+                f'Unit comparison needs a row in {matchup.UNIT_SHEET}. '
+                'Use Compare > Compare units... to pick from a list instead.')
+            return
+        idx = self.tbl.currentIndex()
+        if not idx.isValid():
+            self.lbl_status.setText('Select a unit row first.')
+            return
+        d = self.on_matchup()
+        if d is not None:
+            d.show_units(self.proxy.mapToSource(idx).row())
+
+    def _on_matchup_closed(self, _result):
+        d, self._matchup_dlg = self._matchup_dlg, None
+        if d is not None:
+            d.deleteLater()
+
+    def _discard_matchup(self):
+        """Drop the unit comparison. Its unit list belongs to the old file."""
+        if self._matchup_dlg is not None:
+            d, self._matchup_dlg = self._matchup_dlg, None
+            d.finished.disconnect(self._on_matchup_closed)
+            d.close()
+            d.deleteLater()
+
     # ------------------------------------------------------------- compare
     def on_compare(self):
         if not self.book:
@@ -1089,6 +1168,9 @@ class MainWindow(QMainWindow):
         if not sheet.startswith('Enum_'):
             a0 = m.addAction('Details for this record\tCtrl+Shift+I')
             a0.triggered.connect(lambda: self._detail_for(sheet, r))
+            if sheet == matchup.UNIT_SHEET:
+                a0b = m.addAction('Compare this unit with...\tCtrl+Shift+U')
+                a0b.triggered.connect(self.on_matchup_row)
             m.addSeparator()
         if tbl and tbl.name != '@bool' and isinstance(val, int):
             target = self.book.data_sheet_for_enum(tbl.name)

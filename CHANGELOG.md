@@ -3,7 +3,30 @@
 Also shown in **Help ▸ About**, which is the authoritative copy - it is generated from
 `CHANGELOG` in `brde/about.py`.
 
-## 1.1.1 (current)
+## 1.2.0 (current)
+
+- **Compare two units.** `Compare > Compare units...` (`Ctrl+U`) puts two units in
+  two columns - cost, health, all six armour multipliers, and every weapon with its
+  damage class and damage - and says which one beats which.
+- **The counter is spelled out rather than left to be worked out.** An armour
+  multiplier scales the damage a unit takes, so above 1 is a weakness and below 1 is
+  resistance, which reads backwards from armour in most games. "Counter matchup" runs
+  each unit's weapons against the other's armour and gives the damage landed and the
+  hits to kill, and a sentence at the top names the winner: the Dragon Spearman's
+  `AMPiercing` of 4.0 means a Samurai arrow lands 104 damage and kills in three hits,
+  against 120 hits coming back.
+- **Upgraded units, not paper ones.** Health, armour and weapon damage all move once
+  techniques are researched, so comparing the raw sheet values describes units nobody
+  ever fields. "Apply techniques" recomputes both sides fully upgraded and shows every
+  value a technique moved as `base -> upgraded`. Ten placeholder rows in
+  `Data_Techniques` that each multiply the Dragon Archer's damage by 1.4 are left out:
+  nothing researches them, and stacked they would turn an 18 damage arrow into 730.
+- Green means good for the unit in that column and red means bad for it, in the armour
+  rows and the matchup rows alike.
+- The comparison exports to CSV, follows edits live, and right-clicking a row in
+  `Data_Units` loads that unit straight into it.
+
+## 1.1.1
 
 - **Abilities on the record page.** A unit's abilities were missing, because
   `Data_Units` has no ability column at all - the link runs through a separate join

@@ -81,6 +81,39 @@ particle effects and sound events - but the Dragon Samurai unit is at the top.
 
 ---
 
+## Which unit beats which
+
+**Compare ▸ Compare units…** (`Ctrl+U`) puts two units side by side: cost, health, all
+six armour multipliers, and every weapon with its damage class and damage.
+
+The important thing it does is read the counter out loud. **An armour multiplier scales
+the damage a unit takes**, so above 1 is a weakness and below 1 is resistance - backwards
+from armour in most games, and the reason the Dragon Spearman's `AMPiercing` of 4.0 makes
+it melt under arrow fire.
+
+The **Counter matchup** section runs each unit's weapons against the other's armour and
+gives the damage that actually lands and the hits to kill, with a sentence at the top
+naming the winner:
+
+> **Dragon Samurai** counters Dragon Spearman. Dragon Samurai attacks with
+> WEAPON_SAMURAIARROW, which is piercing, and Dragon Spearman takes piercing damage at
+> ×4 - 104 a hit, 3 hits to kill. Back the other way, Dragon Spearman attacks with
+> WEAPON_SPEAR, which is piercing, and Dragon Samurai takes piercing damage at ×0.25 -
+> 5.2 a hit, 120 hits to kill.
+
+Green is good for the unit in that column, red is bad for it - in the armour rows and the
+matchup rows alike, because each matchup column holds what that unit does *to* the other.
+
+**Techniques are applied by default**, because health, armour and weapon damage all move
+once they are researched and the raw sheet values describe units nobody ever fields. Every
+value a technique moved is shown as `450 -> 630`; untick **Apply techniques** to see the
+file as written.
+
+Right-click a row in `Data_Units` to load that unit straight in, edit any cell in the main
+window and the verdict recomputes, and **Export to CSV…** saves the whole comparison.
+
+---
+
 ## Comparing two files
 
 **Compare ▸ Compare with another file…** (`Ctrl+D`) reports every difference between
@@ -112,6 +145,7 @@ The comparison includes your unsaved edits, and warns you before it starts.
 | Feature | What it does |
 | --- | --- |
 | **Record details** | `Ctrl+I`. Search a unit or building by name and read every stat on one page, weapon damage included. Editable in place. |
+| **Unit vs unit** | `Ctrl+U`. Two units side by side, with the counter worked out from damage class against armour multiplier, and techniques applied. |
 | **Dropdowns instead of raw numbers** | 546 reference columns are detected automatically. Pick `17 - WEAPON_BOWBASH` from a list instead of looking the number up by hand. |
 | **Type to search the dropdown** | Long lists - 2,900 sound codes, for example - filter as you type, matching any part of the name. |
 | **Show enum descriptions** | The grid shows `0 - UNIT_D_ARCHER` instead of `0`. Untick to see raw codes. |
@@ -136,7 +170,7 @@ The comparison includes your unsaved edits, and warns you before it starts.
 | **Edit** | Undo · Redo · Copy · Paste · Clear cells · Revert to original · Add row |
 | **View** | Show enum descriptions · Filter rows · Go to sheet… · List edited cells |
 | **Record** | Find record… (`Ctrl+I`) · Details for the selected row (`Ctrl+Shift+I`) |
-| **Compare** | Compare with another file… (`Ctrl+D`) · Compare with last file again · Show last report · Clear comparison |
+| **Compare** | Compare with another file… (`Ctrl+D`) · Compare with last file again · Show last report · Clear comparison · Compare units… (`Ctrl+U`) · Compare this unit with… (`Ctrl+Shift+U`) |
 | **Help** | How to use (`F1`) · About |
 
 ---
