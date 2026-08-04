@@ -3,4 +3,5 @@ brde/__pycache__/
 dist/
 *.spec
 *.bak
-*.xlsx.*.bak
+*.xlsx
+CLAUDE.MD
