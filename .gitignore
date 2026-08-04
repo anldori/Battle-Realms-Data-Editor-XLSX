@@ -1,0 +1,6 @@
+brde/__pycache__/
+*.py[cod]
+dist/
+*.spec
+*.bak
+*.xlsx.*.bak
