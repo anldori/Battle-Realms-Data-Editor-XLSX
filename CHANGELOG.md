@@ -1,12 +1,12 @@
 # Changelog
 
-Also shown in **Help ▸ About**, which is the authoritative copy — it is generated from
+Also shown in **Help ▸ About**, which is the authoritative copy - it is generated from
 `CHANGELOG` in `brde/about.py`.
 
 ## 1.1.1 (current)
 
 - **Abilities on the record page.** A unit's abilities were missing, because
-  `Data_Units` has no ability column at all — the link runs through a separate join
+  `Data_Units` has no ability column at all - the link runs through a separate join
   sheet. The page now follows it, and shows innate abilities, the ability each piece of
   battle gear grants, spells, and the techniques that affect the unit, each with its
   name and key stats and editable in place. The Dragon Samurai gets its Seppuku, Dragon
@@ -16,7 +16,7 @@ Also shown in **Help ▸ About**, which is the authoritative copy — it is gene
   References into the same sheet through a different column are still listed.
 - Techniques now name the ability they change instead of showing a bare code number.
 - **Records are findable by their real name.** Only 32 of the 87 data sheets call the
-  name column `Name` — abilities call it `ActualAbility`, weapons `ActualWeapon` — so
+  name column `Name` - abilities call it `ActualAbility`, weapons `ActualWeapon` - so
   searching for "Dragon Skin" or "Sight Beyond Sight" found nothing, even though the
   record page was already showing that name. The record you meant still ranks first:
   "samurai" leads with the Dragon Samurai, not with its sound effects.
@@ -39,7 +39,7 @@ Also shown in **Help ▸ About**, which is the authoritative copy — it is gene
   touched: `CreatedUnitType`, `SetWeapon` and `UpgradeUnit` still resolve normally.
 - **Technique effects were reading from the wrong code table.**
   `TECHNIQUE_DRAGONS_STRENGTH` showed `EFFECT_BALLISTAMAN_TOTEM_IMPACT` when the code
-  means `TE_WP_MULT_DAMAGE` — multiply weapon damage, by the factor beside it. Effect
+  means `TE_WP_MULT_DAMAGE` - multiply weapon damage, by the factor beside it. Effect
   columns in `Data_Techniques` now read `Enum_TechniqueEffectType`, and each one is
   shown next to the `FloatParam` it scales by, so the pair reads as one statement.
 - **Buildings show what they research.** A tavern or a dojo never listed its techniques
