@@ -5,3 +5,4 @@ dist/
 *.bak
 *.xlsx
 CLAUDE.MD
+tests/
