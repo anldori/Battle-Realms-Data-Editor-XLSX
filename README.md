@@ -33,6 +33,9 @@ python br_editor.py                                  # welcome screen
 python br_editor.py "C:\path\to\Battle Realms.xlsx"  # open a file directly
 ```
 
+<img width="1442" height="892" alt="image" src="https://github.com/user-attachments/assets/8a26321b-3d30-46d1-814c-6d9a4b641734" />
+
+
 ### Opening your file
 
 The app starts on a welcome screen with nothing loaded. Open a file in any of three
@@ -47,6 +50,8 @@ on the welcome screen.
 
 > Keep a backup copy of the original `Battle Realms.xlsx` before you start modding.
 > The editor also writes a `.bak` next to the file every time you save.
+
+<img width="1442" height="892" alt="image" src="https://github.com/user-attachments/assets/e84cf1a9-20d9-442e-9683-19524d830d69" />
 
 ---
 
@@ -78,6 +83,8 @@ Field names in blue are links: double-click to open that record, **< Back** to r
 
 Search puts the obvious answer first. Typing `samurai` matches 45 records - mostly
 particle effects and sound events - but the Dragon Samurai unit is at the top.
+
+<img width="1595" height="1016" alt="image" src="https://github.com/user-attachments/assets/d866629e-ca39-40eb-8966-b336b0e80ff3" />
 
 ---
 
@@ -111,6 +118,8 @@ file as written.
 
 Right-click a row in `Data_Units` to load that unit straight in, edit any cell in the main
 window and the verdict recomputes, and **Export to CSV…** saves the whole comparison.
+
+<img width="1388" height="960" alt="image" src="https://github.com/user-attachments/assets/0fc40b0c-0d4b-46f8-ad0a-a709f30d8bd8" />
 
 ---
 
