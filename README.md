@@ -135,7 +135,7 @@ file as written.
 Right-click a row in `Data_Units` to load that unit straight in, edit any cell in the main
 window and the verdict recomputes, and **Export to CSV…** saves the whole comparison.
 
-<img width="1388" height="960" alt="image" src="https://github.com/user-attachments/assets/0fc40b0c-0d4b-46f8-ad0a-a709f30d8bd8" />
+<img width="1424" height="792" alt="image" src="https://github.com/user-attachments/assets/36415592-a7b0-4674-bcda-743d169658b3" />
 
 ---
 
