@@ -91,7 +91,13 @@ particle effects and sound events - but the Dragon Samurai unit is at the top.
 ## Which unit beats which
 
 **Compare ▸ Compare units…** (`Ctrl+U`) puts two units side by side: cost, health, all
-six armour multipliers, and every weapon with its damage class and damage.
+six armour multipliers, and every weapon with its damage class and damage. Both boxes
+open empty - nothing is compared until you pick a unit on each side.
+
+> **For reference only.** This compares the numbers in the file. A real fight also turns
+> on attack and animation speed, reach and unit size, formation and terrain, stamina,
+> abilities, and who strikes first, so treat the verdict as a guide rather than as the
+> outcome.
 
 The important thing it does is read the counter out loud. **An armour multiplier scales
 the damage a unit takes**, so above 1 is a weakness and below 1 is resistance - backwards
@@ -100,13 +106,23 @@ it melt under arrow fire.
 
 The **Counter matchup** section runs each unit's weapons against the other's armour and
 gives the damage that actually lands and the hits to kill, with a sentence at the top
-naming the winner:
+naming the winner.
 
-> **Dragon Samurai** counters Dragon Spearman. Dragon Samurai attacks with
-> WEAPON_SAMURAIARROW, which is piercing, and Dragon Spearman takes piercing damage at
-> ×4 - 104 a hit, 3 hits to kill. Back the other way, Dragon Spearman attacks with
-> WEAPON_SPEAR, which is piercing, and Dragon Samurai takes piercing damage at ×0.25 -
-> 5.2 a hit, 120 hits to kill.
+**It does this once per distance**, because a weapon is only in the fight at the range it
+is used at. A Dragon Samurai carries a katana it swings in contact and an arrow it fires
+from 7 to 12 away; a Serpent Ronin never fights further off than 0.5, so the arrow is
+never fired at it and the katana is what the melee table holds. There are two tables,
+**at range** and **in melee**, and each weapon in the weapon list says which one it
+belongs to.
+
+That also means a unit only wins outright when it wins everywhere it can reach. Where the
+two units each own a distance, the verdict says so and leaves the fight to whoever gets
+the range they want:
+
+> It depends on the range - Dragon Archer wins at range, Dragon Spearman wins in melee. At
+> range, Dragon Archer attacks with WEAPON_ARROW, which is piercing, and Dragon Spearman
+> takes it at ×4 - 93.6 a hit, 3 hits to kill, and Dragon Spearman cannot reply. In melee,
+> Dragon Archer attacks with WEAPON_BOWBASH […]
 
 Green is good for the unit in that column, red is bad for it - in the armour rows and the
 matchup rows alike, because each matchup column holds what that unit does *to* the other.

@@ -5,6 +5,10 @@ Pick two units, read their stats side by side, and see which one beats which.
 All of the arithmetic lives in `brde/matchup.py`; this file only draws it, which
 is why the rules can be tested without a display.
 
+The matchup is drawn once per reach band, because `matchup.py` works it out once
+per reach band: a katana and a bow are never in the same table, since only one of
+them can be used at whatever distance the fight is at.
+
 Colour is the shortest sentence on the page, so it means one thing throughout:
 green is good for the unit whose column it sits in, red is bad for it, and the
 deeper the shade the stronger the reading. In the armour section that reads as
@@ -45,6 +49,21 @@ MUTED_FG = QColor(120, 132, 150)
 # immune to, which lands nothing and can never kill. Giving -3 its own calmer colour
 # for the second reading is what once painted the first one as if it barely mattered,
 # so that a 1.25 sat in red beside a 4.0 that did not.
+# What the window says before either picker has been used. The comparison is not
+# run until the user asks for one, so this is the opening state and not an error.
+PROMPT = 'Pick a unit on each side to compare them.'
+
+# The honest limit on everything below it. The page compares what the workbook
+# stores, and a workbook stores none of what decides a real fight: how fast an
+# attack animation commits and recovers, how far a unit walks between swings,
+# unit size and formation, terrain and height, stamina, abilities, healing, and
+# who lands the first hit. So the verdict is a reading of the numbers, which is
+# a useful thing and not the same thing as a result.
+CAVEAT = ('For reference only. This compares the numbers in the file, and a '
+          'real fight also turns on attack and animation speed, reach and unit '
+          'size, formation and terrain, stamina, abilities, and who strikes '
+          'first. Treat the verdict as a guide, not as the outcome.')
+
 RANK_BG = {
     3: QColor(190, 231, 203),
     2: QColor(223, 243, 229),
@@ -240,13 +259,23 @@ class MatchupWindow(QDialog):
         v.addLayout(opts)
 
         # ---- verdict
-        self.lbl_verdict = QLabel('Pick two units to compare.')
+        self.lbl_verdict = QLabel(PROMPT)
         self.lbl_verdict.setWordWrap(True)
         self.lbl_verdict.setTextFormat(Qt.TextFormat.RichText)
         self.lbl_verdict.setStyleSheet(
             'background:#f4f7fc; border:1px solid #d8dee8; border-radius:5px;'
             'padding:9px 11px; color:#1c2b45;')
         v.addWidget(self.lbl_verdict)
+
+        # Always on screen, not folded into the verdict box: the caveat applies
+        # just as much once a verdict is showing, and that is when it is easiest
+        # to forget. See CAVEAT.
+        self.lbl_caveat = QLabel(CAVEAT)
+        self.lbl_caveat.setWordWrap(True)
+        self.lbl_caveat.setStyleSheet('color:#7a6a3e; background:#fdf8e8;'
+                                      'border:1px solid #ecdfae;'
+                                      'border-radius:5px; padding:7px 11px;')
+        v.addWidget(self.lbl_caveat)
 
         # ---- table
         self.model = MatchupModel(self)
@@ -290,15 +319,21 @@ class MatchupWindow(QDialog):
 
         self.lbl_hint = QLabel(
             'A unit\'s armour multiplier scales the damage it takes, so above 1 '
-            'is a weakness and below 1 is resistance. Green is good for the unit '
-            'in that column, red is bad for it.')
+            'is a weakness and below 1 is resistance. The matchup is run once '
+            'per distance, because a weapon is only in the fight at the range '
+            'it is used at. Green is good for the unit in that column, red is '
+            'bad for it.')
         self.lbl_hint.setWordWrap(True)
         self.lbl_hint.setStyleSheet('color:#5a6b85;')
         v.addWidget(self.lbl_hint)
 
-        if len(self.units) >= 2:
-            self.cb_a.setCurrentIndex(0)
-            self.cb_b.setCurrentIndex(1)
+        # Both pickers open empty. Starting on the first two units in the list
+        # puts a comparison nobody asked for in front of the user - the Dragon
+        # Archer against the Dragon Battle Maiden - and it reads as an answer
+        # rather than as a default, which is the wrong first impression for a
+        # window whose whole output is a judgement.
+        self.cb_a.setCurrentIndex(-1)
+        self.cb_b.setCurrentIndex(-1)
         self.cb_a.currentIndexChanged.connect(lambda _i: self.refresh())
         self.cb_b.currentIndexChanged.connect(lambda _i: self.refresh())
         self.refresh()
@@ -316,6 +351,7 @@ class MatchupWindow(QDialog):
         comp.setFilterMode(Qt.MatchFlag.MatchContains)
         comp.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         cb.setCompleter(comp)
+        cb.lineEdit().setPlaceholderText('Type or pick a unit')
         select_all_on_focus(cb)
         # Enter is handled here rather than by Qt; see _CommitOnReturn. Losing
         # focus needs no help - QComboBox puts the current item's text back by
@@ -344,6 +380,11 @@ class MatchupWindow(QDialog):
         highlighted, so a rule that skipped while it was visible would leave the
         box reading "samura" in exactly the case that matters most.
 
+        Both pickers start on no unit at all, so "what the box really holds" is
+        an empty string until the user has chosen once. Text that resolves to
+        nothing is wiped rather than left sitting there, for the same reason a
+        half-typed name is: the box must never name something the columns do not.
+
         The grid's enum dropdown deliberately has no equivalent: there, an
         unlisted code is a legitimate thing to type. See EnumDelegate.
         """
@@ -356,9 +397,9 @@ class MatchupWindow(QDialog):
                 i = hits[0]
         if i >= 0:
             cb.setCurrentIndex(i)          # emits currentIndexChanged -> refresh
-            cb.setEditText(cb.itemText(i))
-        elif cb.currentIndex() >= 0:
-            cb.setEditText(cb.itemText(cb.currentIndex()))
+        # itemText(-1) is the empty string, which is exactly what an unchosen
+        # picker should read, so both outcomes are the same line.
+        cb.setEditText(cb.itemText(cb.currentIndex()))
 
     # ------------------------------------------------------------ selection
     def show_units(self, row_a, row_b=None):
@@ -387,9 +428,14 @@ class MatchupWindow(QDialog):
         ra, rb = self.cb_a.currentData(), self.cb_b.currentData()
         if ra is None or rb is None:
             self.model.set_page([], '', '')
-            self.lbl_verdict.setText('This file has no units to compare.')
+            self.lbl_verdict.setText(
+                PROMPT if self.units else 'This file has no units to compare.')
             self.b_detail_a.setEnabled(False)
             self.b_detail_b.setEnabled(False)
+            self.b_detail_a.setText('Details')
+            self.b_detail_b.setText('Details')
+            self._a, self._b = None, None
+            self.setWindowTitle('Compare units')
             return
         a, b, v, rows = matchup.compare_units(
             self.book, ra, rb, self.chk_tech.isChecked())
@@ -477,6 +523,9 @@ class MatchupWindow(QDialog):
                 w.writerow(['# File', self.book.path])
                 w.writerow(['# Techniques applied',
                             'yes' if self.chk_tech.isChecked() else 'no'])
+                # The caveat travels with the numbers. A CSV outlives the window
+                # it came from and is read by people who never saw the notice.
+                w.writerow(['# Note', CAVEAT])
                 w.writerow([])
                 w.writerow(['', self._a.title, self._b.title])
                 for it in self.model.rows:

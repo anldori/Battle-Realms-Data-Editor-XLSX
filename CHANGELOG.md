@@ -3,7 +3,34 @@
 Also shown in **Help ▸ About**, which is the authoritative copy - it is generated from
 `CHANGELOG` in `brde/about.py`.
 
-## 1.2.0 (current)
+## 1.2.1 (current)
+
+- **The comparison was picking a weapon the fight never uses.** It scored every
+  weapon a unit carried together and reported whichever landed the most damage, with
+  no regard for how far away that weapon works. A Dragon Samurai against a Serpent
+  Ronin came out as a samurai arrow against ronin swords - but the arrow needs 7 clear
+  and the Ronin never fights further off than 0.5, so the shot is never taken. The
+  Samurai swings its katana, and that is now what the matchup says.
+- **The matchup runs once per distance.** "Counter matchup at range" and "Counter
+  matchup in melee" are separate tables, each holding only the weapons usable at that
+  distance, and each weapon in the weapon list says which of the two it belongs to. A
+  unit with nothing to fire back is called out rather than left as an empty column.
+- **A unit that wins at one distance and loses at the other is no longer given the
+  win.** The Dragon Archer beats the Dragon Spearman at range and loses to it in
+  contact, so the verdict names both and leaves the fight to whoever gets the range
+  they want. A winner is declared only where one unit wins everywhere it can reach.
+- The slot a weapon sits in never meant "main weapon" and is no longer read as if it
+  did - the Samurai's `PrimaryWeapon` is its arrow and its katana sits in the
+  secondary slot.
+- **The window no longer opens on a comparison nobody asked for.** It used to load the
+  first two units in the list and show a verdict about them straight away. Both boxes
+  now start empty and wait to be filled in.
+- **A standing note that the verdict is for reference.** The page compares the numbers
+  in the file, and a real fight also turns on attack and animation speed, reach and unit
+  size, formation and terrain, stamina, abilities, and who strikes first. The note stays
+  on screen while the comparison is being read, and goes into the CSV export with it.
+
+## 1.2.0
 
 - **Compare two units.** `Compare > Compare units...` (`Ctrl+U`) puts two units in
   two columns - cost, health, all six armour multipliers, and every weapon with its

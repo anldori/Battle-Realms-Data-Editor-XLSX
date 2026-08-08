@@ -21,6 +21,15 @@ comparison of the raw sheet values describes units nobody ever fields. Every
 figure here can therefore be shown twice, before and after the techniques that
 name the unit - see `apply_techniques`.
 
+The second rule is reach. A unit carries up to two weapons that are used at
+different distances, and only one of them is in play at a time: the Dragon
+Samurai swings a katana in contact and shoots an arrow from 7 to 12 away, and
+whichever the fight is at, the other one is not being used. So the comparison is
+made twice, once per reach band - see `MELEE` and `RANGED` - because a single
+"best weapon" picked on damage alone answers a question nobody asked. Against a
+melee-only unit such as the Serpent Ronin the Samurai's arrow simply never fires
+once the two are in contact.
+
 This module holds no Qt at all, the way `brde/schema.py` does not - it is plain
 computation over a `BRWorkbook`, down to and including the page layout that
 `build_rows` returns. The window that draws it lives in `brde/matchup_ui.py`.
@@ -60,8 +69,27 @@ TE_MAX_HP = 'TE_UNIT_MULT_MAX_HP'
 TE_DAMAGE = 'TE_WP_MULT_DAMAGE'
 
 # The four columns naming a weapon, and the label each one gets on the page.
+#
+# None of these says which weapon a unit "really" uses, and PrimaryWeapon in
+# particular does not: the Dragon Samurai's primary is its arrow and its katana
+# sits in the secondary slot. Reach is what decides, not the slot - see below.
 WEAPON_SLOTS = [('MeleeWeapon', 'Melee'), ('MissileWeapon', 'Missile'),
                 ('PrimaryWeapon', 'Primary'), ('SecondaryWeapon', 'Secondary')]
+
+# The two distances a fight happens at. A weapon belongs to exactly one of them,
+# so the two units are compared once per band and never with a weapon that could
+# not be swung or fired at that distance.
+MELEE, RANGED = 'melee', 'ranged'
+BAND_LABEL = {MELEE: 'in melee', RANGED: 'at range'}
+
+# Data_Weapons.Class, the game's own marker. WEAPONCLASS_MELEE is a weapon used
+# in contact; WEAPONCLASS_PROJECTILE and WEAPONCLASS_INSTANTHIT are fired across
+# a gap. The vanilla file classes all 194 carried weapons, and the numbers agree
+# with it - no melee weapon reaches past 4, no projectile starts closer than 3 -
+# so the fallback below only matters to a mod that leaves Class unset.
+MELEE_CLASS = 'WEAPONCLASS_MELEE'
+RANGED_CLASSES = ('WEAPONCLASS_PROJECTILE', 'WEAPONCLASS_INSTANTHIT')
+MELEE_REACH = 4.0
 
 # Enum_WeaponSlotType codes, used by Data_Techniques.WeaponSlotAffected1 to say
 # which weapon a damage bonus applies to. WEAPONSLOT_INVALID (-1) is treated as
@@ -200,6 +228,28 @@ class Attack:
             if dc == self.raw_class:
                 return am
         return None
+
+    @property
+    def band(self):
+        """MELEE or RANGED - the distance this weapon is used at.
+
+        The weapon's own Class is the answer wherever the record carries one.
+        Where it does not - or carries WEAPONCLASS_INVALID, which says nothing -
+        the ranges decide: anything that has to stand off (`MinRange` above
+        zero) or that reaches past the longest melee weapon in the game is fired
+        rather than swung.
+        """
+        if self.weapon_class == MELEE_CLASS:
+            return MELEE
+        if self.weapon_class in RANGED_CLASSES:
+            return RANGED
+        if self.min_range > 0 or self.max_range > MELEE_REACH:
+            return RANGED
+        return MELEE
+
+    @property
+    def band_label(self):
+        return BAND_LABEL[self.band]
 
     @property
     def title(self):
@@ -453,10 +503,17 @@ class Threat:
         self.wording = wording
 
 
-def threats(attacker: UnitStats, defender: UnitStats):
-    """Every weapon `attacker` carries, scored against `defender`'s armour."""
+def threats(attacker: UnitStats, defender: UnitStats, band=None):
+    """Every weapon `attacker` carries, scored against `defender`'s armour.
+
+    `band` limits the result to the weapons usable at one distance. Left None,
+    every weapon is scored, which is what the weapon listing wants but never
+    what a fight wants: see `engage`.
+    """
     out = []
     for a in attacker.attacks:
+        if band is not None and a.band != band:
+            continue
         mult = defender.armour_against(a)
         if mult is None:
             continue
@@ -467,68 +524,164 @@ def threats(attacker: UnitStats, defender: UnitStats):
     return out
 
 
-def best_threat(attacker: UnitStats, defender: UnitStats):
+def best_threat(attacker: UnitStats, defender: UnitStats, band=None):
     """The weapon that kills `defender` fastest, or None when it cannot attack."""
-    scored = [t for t in threats(attacker, defender) if t.damage > 0]
+    scored = [t for t in threats(attacker, defender, band) if t.damage > 0]
     if not scored:
         return None
     return max(scored, key=lambda t: t.damage)
 
 
+class Engagement:
+    """The fight at one distance: each unit's best weapon within that band.
+
+    Splitting the fight this way is the whole point. A Dragon Samurai out-damages
+    a Serpent Ronin with its arrow, but the arrow needs 7 clear and the Ronin
+    only ever fights at 0.5, so in the fight that actually happens the Samurai
+    swings its katana. Scoring every weapon together would report the arrow and
+    be wrong about the one thing the window is for.
+    """
+
+    __slots__ = ('band', 'threats_a', 'threats_b', 'best_a', 'best_b', 'winner')
+
+    def __init__(self, band, threats_a, threats_b, best_a, best_b, winner):
+        self.band = band
+        self.threats_a = threats_a    # every weapon in this band, scored
+        self.threats_b = threats_b
+        self.best_a = best_a          # the one that kills fastest, or None
+        self.best_b = best_b
+        self.winner = winner          # 'a', 'b' or None
+
+    @property
+    def contested(self):
+        """True when either unit brings a weapon to this distance.
+
+        Carrying one is enough, landing damage with it is not. A weapon the
+        other unit is immune to still belongs in the table - "immune" is the
+        strongest reading the page has, and dropping the band would hide it.
+        """
+        return bool(self.threats_a or self.threats_b)
+
+    @property
+    def label(self):
+        return BAND_LABEL[self.band]
+
+
+def engage(a: UnitStats, b: UnitStats, band) -> Engagement:
+    """Who kills first at one distance. A unit that cannot reply loses it."""
+    ta, tb = threats(a, b, band), threats(b, a, band)
+    ba, bb = (max((t for t in lst if t.damage > 0),
+                  key=lambda t: t.damage, default=None) for lst in (ta, tb))
+    if ba is not None and bb is not None:
+        winner = 'a' if ba.hits < bb.hits else ('b' if bb.hits < ba.hits else None)
+    else:
+        winner = 'a' if ba is not None else ('b' if bb is not None else None)
+    return Engagement(band, ta, tb, ba, bb, winner)
+
+
 class Verdict:
-    """Who wins the straight one-on-one, and the sentence explaining it."""
+    """Who wins the straight one-on-one, and the sentences explaining it.
 
-    __slots__ = ('a', 'b', 'best_a', 'best_b', 'winner', 'text')
+    `melee` and `ranged` are the two `Engagement`s. `winner` is the unit that
+    wins wherever the fight is contested, and it is None when the two bands
+    disagree - an archer beats a spearman at range and loses to it in contact,
+    and naming either one the winner would be advice that is wrong half the
+    time. `phases` lists the contested bands in the order the fight meets them.
+    """
 
-    def __init__(self, a, b, best_a, best_b, winner, text):
+    __slots__ = ('a', 'b', 'melee', 'ranged', 'winner', 'text')
+
+    def __init__(self, a, b, melee, ranged, winner, text):
         self.a = a
         self.b = b
-        self.best_a = best_a
-        self.best_b = best_b
+        self.melee = melee
+        self.ranged = ranged
         self.winner = winner          # 'a', 'b' or None
         self.text = text
 
+    @property
+    def phases(self):
+        """The contested bands, ranged first - that is where the fight opens."""
+        return [e for e in (self.ranged, self.melee) if e.contested]
+
+    @property
+    def decisive(self):
+        """The closest band `winner` takes, or None when nobody wins one.
+
+        The closest, rather than the first, because that is the band the loser
+        can force: anything melee walks up, and a unit that shoots freely on the
+        way in has still not won until it wins in contact. Reading the headline
+        off the ranged band would call a Samurai a hard counter to a Ronin on
+        the strength of arrows the Ronin never stands still for.
+        """
+        if self.winner is None:
+            return None
+        return next((e for e in reversed(self.phases)
+                     if e.winner == self.winner), None)
+
+
+def _side(t, atk, dfn):
+    """One unit's half of an exchange, in the words the whole window uses."""
+    return (f'{atk.title} attacks with {t.attack.name}, which is '
+            f'{t.attack.class_label.lower()}, and {dfn.title} takes it at '
+            f'{_mult(t.mult)} - {fmt(t.damage, 1)} a hit, '
+            f'{_hits(t.hits)} to kill')
+
+
+def _phase_text(e: Engagement, a: UnitStats, b: UnitStats):
+    """What happens at one distance, as one sentence."""
+    lead = e.label.capitalize()
+    if e.best_a is not None and e.best_b is not None:
+        return (f'{lead}, {_side(e.best_a, a, b)}; '
+                f'{_side(e.best_b, b, a)}.')
+    if e.best_a is None and e.best_b is None:
+        # Both carry something to this distance and neither of them lands.
+        return f'{lead}, neither {a.title} nor {b.title} lands any damage.'
+    # Only one side can hurt the other, which is the strongest thing a band says.
+    win, lose = (a, b) if e.best_a is not None else (b, a)
+    t = e.best_a if e.best_a is not None else e.best_b
+    return (f'{lead}, {_side(t, win, lose)}, and {lose.title} cannot reply.')
+
 
 def verdict(a: UnitStats, b: UnitStats) -> Verdict:
-    """Compare hits to kill both ways and put the result into one sentence."""
-    ta, tb = best_threat(a, b), best_threat(b, a)
+    """Fight the two units at each distance and put the result into words."""
+    melee, ranged = engage(a, b, MELEE), engage(a, b, RANGED)
+    v = Verdict(a, b, melee, ranged, None, '')
+    phases = v.phases
 
-    if ta is None and tb is None:
-        return Verdict(a, b, None, None, None,
-                       f'Neither {a.title} nor {b.title} can damage the other.')
-    if ta is None:
-        return Verdict(a, b, None, tb, 'b',
-                       f'{a.title} cannot damage {b.title} at all, while '
-                       f'{b.title} kills it in {_hits(tb.hits)} with its '
-                       f'{tb.attack.name}.')
-    if tb is None:
-        return Verdict(a, b, ta, None, 'a',
-                       f'{b.title} cannot damage {a.title} at all, while '
-                       f'{a.title} kills it in {_hits(ta.hits)} with its '
-                       f'{ta.attack.name}.')
+    if not phases:
+        v.text = f'Neither {a.title} nor {b.title} can damage the other.'
+        return v
 
-    winner = None
-    if ta.hits < tb.hits:
-        winner = 'a'
-    elif tb.hits < ta.hits:
-        winner = 'b'
+    winners = {e.winner for e in phases if e.winner}
+    body = ' '.join(_phase_text(e, a, b) for e in phases)
 
-    def side(t, atk, dfn):
-        return (f'{atk.title} attacks with {t.attack.name}, which is '
-                f'{t.attack.class_label.lower()}, and {dfn.title} takes '
-                f'{t.attack.class_label.lower()} damage at {_mult(t.mult)} - '
-                f'{fmt(t.damage, 1)} a hit, {_hits(t.hits)} to kill')
-
-    if winner is None:
-        text = (f'Evenly matched at {_hits(ta.hits)} each way. '
-                + side(ta, a, b) + '. ' + side(tb, b, a) + '.')
+    if len(winners) == 1:
+        v.winner = winners.pop()
+        win, lose = (a, b) if v.winner == 'a' else (b, a)
+        e = v.decisive
+        tw = e.best_a if v.winner == 'a' else e.best_b
+        tl = e.best_b if v.winner == 'a' else e.best_a
+        # "Counters" is reserved for a rout: an opponent that cannot reach back
+        # at all, or a multiplier working for the winner at twice the speed.
+        edge = ('counters' if tl is None or (tw.rank > 0 and tw.hits * 2 <= tl.hits)
+                else 'beats')
+        # Name the band only when the other one is not also won - "beats it at
+        # range" would undersell a unit that beats it everywhere.
+        where = (f' {e.label}' if any(p.winner != v.winner for p in phases)
+                 else '')
+        head = f'{win.title} {edge} {lose.title}{where}.'
+    elif winners:
+        # Each unit owns a distance, so the fight is decided by who closes.
+        split = ', '.join(f'{(a if e.winner == "a" else b).title} wins {e.label}'
+                          for e in phases if e.winner)
+        head = f'It depends on the range - {split}.'
     else:
-        win, lose = (a, b) if winner == 'a' else (b, a)
-        tw, tl = (ta, tb) if winner == 'a' else (tb, ta)
-        edge = 'counters' if tw.rank > 0 and tw.hits * 2 <= tl.hits else 'beats'
-        text = (f'{win.title} {edge} {lose.title}. ' + side(tw, win, lose)
-                + '. Back the other way, ' + side(tl, lose, win) + '.')
-    return Verdict(a, b, ta, tb, winner, text)
+        # Both names would appear twice over in a mirror match, so neither does.
+        head = 'Evenly matched - neither side kills first at any range.'
+
+    v.text = f'{head} {body}'
+    return v
 
 
 # ------------------------------------------------------------------ page model
@@ -572,6 +725,16 @@ def _stat(label, va, vb, higher_is_better=True, places=2):
     if better and not higher_is_better:
         better = 'b' if better == 'a' else 'a'
     return Row(label, fmt(va, places), fmt(vb, places), better=better)
+
+
+def _winner_row(label, winner):
+    """'wins' in the winning unit's column, coloured as the best thing there is."""
+    return Row(label,
+               'wins' if winner == 'a' else '',
+               'wins' if winner == 'b' else '',
+               rank_a=3 if winner == 'a' else None,
+               rank_b=3 if winner == 'b' else None,
+               better=winner)
 
 
 def _upgraded(base, now, places=2):
@@ -620,6 +783,11 @@ def build_rows(a: UnitStats, b: UnitStats, v: Verdict):
         wb = b.attacks[i] if i < len(b.attacks) else None
         out.append(Row(f'Weapon {i + 1}',
                        wa.title if wa else '', wb.title if wb else ''))
+        # Which distance the weapon is used at, spelled out next to it. A slot
+        # name does not say: the Samurai's arrow sits in the primary slot and is
+        # still only fired from 7 away.
+        out.append(Row('Used', wa.band_label if wa else '',
+                       wb.band_label if wb else '', indent=1))
         out.append(Row('Damage class', wa.class_label if wa else '',
                        wb.class_label if wb else '', indent=1))
         out.append(Row('Damage',
@@ -645,42 +813,57 @@ def build_rows(a: UnitStats, b: UnitStats, v: Verdict):
     if not a.attacks and not b.attacks:
         out.append(Row('No weapons', '', ''))
 
-    # The point of the whole window: each column holds what that unit does TO
-    # the other one, so reading down a column tells you how that unit fares.
-    out.append(Section('Counter matchup - each column is what that unit does to '
-                       'the other'))
-    ta, tb = threats(a, b), threats(b, a)
-    for i in range(max(len(ta), len(tb))):
-        x = ta[i] if i < len(ta) else None
-        y = tb[i] if i < len(tb) else None
-        out.append(Row(f'Attack {i + 1}',
-                       f'{x.attack.name} ({x.attack.class_label})' if x else '',
-                       f'{y.attack.name} ({y.attack.class_label})' if y else ''))
-        out.append(Row("Target's armour", _mult(x.mult) if x else '',
-                       _mult(y.mult) if y else '', indent=1,
-                       rank_a=x.rank if x else None,
-                       rank_b=y.rank if y else None))
-        out.append(Row('Damage landed', fmt(x.damage, 1) if x else '',
-                       fmt(y.damage, 1) if y else '', indent=1,
-                       better=_higher(x.damage if x else None,
-                                      y.damage if y else None)))
-        out.append(Row('Hits to kill', str(x.hits) if x and x.hits else '',
-                       str(y.hits) if y and y.hits else '', indent=1,
-                       rank_a=x.rank if x else None,
-                       rank_b=y.rank if y else None,
-                       better=_higher(-(x.hits or 0) if x else None,
-                                      -(y.hits or 0) if y else None)))
-        out.append(Row('Reading', x.wording if x else '',
-                       y.wording if y else '', indent=1))
-    if not ta and not tb:
+    # The point of the whole window, and it is asked once per distance: a weapon
+    # that cannot be used at this range is not in the table at all. Each column
+    # holds what that unit does TO the other, so a column reads top to bottom.
+    phases = v.phases
+    for e in phases:
+        out.append(Section(f'Counter matchup {e.label} - each column is what '
+                           f'that unit does to the other'))
+        ta, tb = e.threats_a, e.threats_b
+        for i in range(max(len(ta), len(tb))):
+            x = ta[i] if i < len(ta) else None
+            y = tb[i] if i < len(tb) else None
+            out.append(Row(
+                f'Attack {i + 1}',
+                f'{x.attack.name} ({x.attack.class_label})' if x else '',
+                f'{y.attack.name} ({y.attack.class_label})' if y else ''))
+            out.append(Row("Target's armour", _mult(x.mult) if x else '',
+                           _mult(y.mult) if y else '', indent=1,
+                           rank_a=x.rank if x else None,
+                           rank_b=y.rank if y else None))
+            out.append(Row('Damage landed', fmt(x.damage, 1) if x else '',
+                           fmt(y.damage, 1) if y else '', indent=1,
+                           better=_higher(x.damage if x else None,
+                                          y.damage if y else None)))
+            out.append(Row('Hits to kill', str(x.hits) if x and x.hits else '',
+                           str(y.hits) if y and y.hits else '', indent=1,
+                           rank_a=x.rank if x else None,
+                           rank_b=y.rank if y else None,
+                           better=_higher(-(x.hits or 0) if x else None,
+                                          -(y.hits or 0) if y else None)))
+            out.append(Row('Reading', x.wording if x else '',
+                           y.wording if y else '', indent=1))
+        # A unit with nothing that reaches this far is the loudest reading in
+        # the band, and an empty column alone does not say it.
+        if not ta or not tb:
+            out.append(Row('No weapon at this range',
+                           'yes' if not ta else '', 'yes' if not tb else '',
+                           rank_a=-3 if not ta else None,
+                           rank_b=-3 if not tb else None))
+        # Only worth saying per band when there is another band to differ from.
+        if len(phases) > 1:
+            out.append(_winner_row(f'Wins {e.label}', e.winner))
+
+    if not phases:
+        out.append(Section('Counter matchup'))
         out.append(Row('Neither unit can attack the other', '', ''))
 
-    out.append(Row('Winner',
-                   'wins' if v.winner == 'a' else '',
-                   'wins' if v.winner == 'b' else '',
-                   rank_a=3 if v.winner == 'a' else None,
-                   rank_b=3 if v.winner == 'b' else None,
-                   better=v.winner))
+    out.append(Section('Verdict'))
+    out.append(_winner_row('Winner', v.winner))
+    if len({e.winner for e in phases if e.winner}) > 1:
+        out.append(Row('Each unit owns a distance - decided by who closes',
+                       '', '', indent=1))
 
     if a.techniques or b.techniques:
         out.append(Section('Techniques applied'))
