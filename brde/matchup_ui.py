@@ -18,7 +18,8 @@ from __future__ import annotations
 import csv
 import os
 
-from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
+from PyQt6.QtCore import (QAbstractTableModel, QEvent, QModelIndex, QObject, Qt,
+                          pyqtSignal)
 from PyQt6.QtGui import QBrush, QColor, QFont
 from PyQt6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox,
                              QCompleter, QDialog, QFileDialog, QHBoxLayout,
@@ -26,6 +27,7 @@ from PyQt6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox,
                              QPushButton, QTableView, QVBoxLayout)
 
 from . import matchup
+from .model import select_all_on_focus
 
 SECTION_BG = QColor(233, 238, 246)
 SECTION_FG = QColor(28, 43, 69)
@@ -51,6 +53,45 @@ RANK_BG = {
     -2: QColor(249, 213, 202),
     -3: QColor(240, 176, 156),
 }
+
+
+class _CommitOnReturn(QObject):
+    """Takes Enter away from Qt in the unit pickers, and resolves it here.
+
+    Qt's own answer to Enter over half-typed text is wrong for this window. With
+    the completion popup open and no row highlighted in it - which is the state
+    after simply typing, since nothing is highlighted until an arrow key is
+    pressed - QComboBox lands on the first item in the list, so "sam" selects
+    the Dragon Archer rather than the Dragon Samurai. It is not a near miss, it
+    is the wrong unit, and the box then reads a name the columns do not hold.
+
+    So the key is intercepted before the completer sees it. The filter is
+    installed after `setCompleter`, and Qt calls the most recently installed
+    filter first, which is what puts this ahead of the completer's own.
+
+    A row highlighted with the arrow keys is a real choice and is let through
+    untouched; everything else is settled by `_settle` and the event is eaten,
+    so nothing downstream gets to guess. Eating it also stops Enter reaching the
+    dialog, which would otherwise be free to press a button while the user
+    thinks they are still picking a unit.
+    """
+
+    def __init__(self, settle, parent=None):
+        super().__init__(parent)
+        self._settle = settle
+
+    def eventFilter(self, obj, ev):
+        if (ev.type() != QEvent.Type.KeyPress
+                or ev.key() not in (Qt.Key.Key_Return, Qt.Key.Key_Enter)):
+            return False
+        comp = obj.completer()
+        popup = comp.popup() if comp is not None else None
+        if popup is not None and popup.isVisible():
+            if popup.currentIndex().isValid():
+                return False
+            popup.hide()
+        self._settle(obj)
+        return True
 
 
 class MatchupModel(QAbstractTableModel):
@@ -275,7 +316,49 @@ class MatchupWindow(QDialog):
         comp.setFilterMode(Qt.MatchFlag.MatchContains)
         comp.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         cb.setCompleter(comp)
+        select_all_on_focus(cb)
+        # Enter is handled here rather than by Qt; see _CommitOnReturn. Losing
+        # focus needs no help - QComboBox puts the current item's text back by
+        # itself - but the connection is kept as the belt to that braces.
+        cb.installEventFilter(_CommitOnReturn(self._settle, cb))
+        cb.lineEdit().editingFinished.connect(lambda c=cb: self._settle(c))
         return cb
+
+    def _settle(self, cb):
+        """Put a picker back onto a real unit once free typing is over.
+
+        The insert policy is NoInsert, so text naming no unit leaves
+        currentIndex where it was and never emits currentIndexChanged. Without
+        this the box would sit reading "samura" while everything below it still
+        meant Dragon Archer, which is the one state the window must never be in:
+        the box is the only thing on screen naming what the columns hold.
+
+        Half-typed text is resolved the way the completer's own list resolves
+        it, by the same case-insensitive "contains" rule, but only when exactly
+        one unit matches. "samura" and "berserker" each name one unit and are
+        taken; "wolf b" names three and "dragon" names sixteen, and guessing
+        between them would be worse than doing nothing, so those snap back too.
+        This is what makes Enter work on a partial name, and it is deliberately
+        not conditioned on whether the completion popup happens to be open:
+        Qt passes Enter through to the line edit when no row in that popup is
+        highlighted, so a rule that skipped while it was visible would leave the
+        box reading "samura" in exactly the case that matters most.
+
+        The grid's enum dropdown deliberately has no equivalent: there, an
+        unlisted code is a legitimate thing to type. See EnumDelegate.
+        """
+        typed = cb.currentText().strip()
+        i = cb.findText(typed, Qt.MatchFlag.MatchFixedString)
+        if i < 0 and typed:
+            hits = [n for n in range(cb.count())
+                    if typed.lower() in cb.itemText(n).lower()]
+            if len(hits) == 1:
+                i = hits[0]
+        if i >= 0:
+            cb.setCurrentIndex(i)          # emits currentIndexChanged -> refresh
+            cb.setEditText(cb.itemText(i))
+        elif cb.currentIndex() >= 0:
+            cb.setEditText(cb.itemText(cb.currentIndex()))
 
     # ------------------------------------------------------------ selection
     def show_units(self, row_a, row_b=None):

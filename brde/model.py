@@ -3,8 +3,8 @@ brde.model - Table model, cell delegate and undo commands for the data grid.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import (QAbstractTableModel, QModelIndex, QSortFilterProxyModel,
-                          Qt, pyqtSignal)
+from PyQt6.QtCore import (QAbstractTableModel, QEvent, QModelIndex, QObject,
+                          QSortFilterProxyModel, Qt, pyqtSignal)
 from PyQt6.QtGui import QBrush, QColor, QFont, QUndoCommand
 from PyQt6.QtWidgets import QComboBox, QCompleter, QStyledItemDelegate, QLineEdit
 
@@ -221,6 +221,83 @@ class MultiSetCommand(QUndoCommand):
             self.m.apply_value(r, c, o)
 
 
+# ------------------------------------------------------------------ combo boxes
+def _select_all(le):
+    try:
+        le.selectAll()
+    except RuntimeError:
+        # The editor was closed inside the same event loop turn that focused it,
+        # which happens when a double-click lands on another cell straight away.
+        pass
+
+
+class _SelectOnFocus(QObject):
+    """Event filter that selects a combobox's text when it gains focus.
+
+    Three details, and each one was arrived at the hard way.
+
+    FocusIn goes to the COMBOBOX, not to its line edit. An editable QComboBox
+    keeps the line edit as a child but takes focus itself, so a filter installed
+    on the line edit is never called even though `lineEdit().hasFocus()` reports
+    True afterwards. Both objects are filtered here because the mouse events go
+    to the line edit while the focus events go to the combobox.
+
+    Selecting inside FocusIn alone does not survive a click: the press and
+    release arrive after it and the release places the caret. So FocusIn only
+    ARMS the selection, which is then made again on the mouse release that
+    completes the click. Focus arriving from the keyboard gets its selection
+    from FocusIn and never sees a release, which is why both are needed.
+
+    The obvious alternative - deferring `selectAll` by a zero-delay timer so it
+    lands after the release - does work, and must not be used. Inside a QDialog
+    it leaves the combobox holding focus permanently: `setFocus()` on any other
+    widget in the window is then silently ignored and no FocusOut is ever
+    delivered, so the box can never be tabbed or clicked out of.
+
+    A keypress disarms, so once typing has begun a click places the caret the
+    way an address bar does, for when the text is meant to be edited rather
+    than replaced.
+    """
+
+    def __init__(self, cb):
+        super().__init__(cb)
+        self._cb = cb
+        self._armed = False
+        cb.installEventFilter(self)
+        cb.lineEdit().installEventFilter(self)
+
+    def eventFilter(self, _obj, ev):
+        t = ev.type()
+        if t == QEvent.Type.FocusIn:
+            self._armed = True
+            _select_all(self._cb.lineEdit())
+        elif t == QEvent.Type.MouseButtonRelease and self._armed:
+            self._armed = False
+            _select_all(self._cb.lineEdit())
+        elif t in (QEvent.Type.KeyPress, QEvent.Type.FocusOut):
+            self._armed = False
+        return False
+
+
+def select_all_on_focus(cb):
+    """Make an editable combobox replace its contents on the first keystroke.
+
+    Both editable comboboxes in the app are really search boxes over a list too
+    long to scroll - 155 units in the comparison picker, 2,900 codes in some
+    enum columns - and both open showing the value already in force. Without
+    this, focusing one drops a caret into the middle of that text, so typing
+    "sam" over "Dragon Archer  (CLAN_DRAGON)" edits it into nonsense instead of
+    searching for a Samurai, and the old value has to be cleared by hand first.
+
+    The filter parents itself to the combobox and installs itself on both the
+    combobox and its line edit, for the reasons given in `_SelectOnFocus`. A
+    combobox that is not editable has no line edit and is left alone.
+    """
+    if cb.lineEdit() is not None:
+        _SelectOnFocus(cb)
+    return cb
+
+
 # ------------------------------------------------------------------ delegate
 class EnumDelegate(QStyledItemDelegate):
     """Enum columns get a searchable combobox; everything else a plain line edit."""
@@ -247,7 +324,13 @@ class EnumDelegate(QStyledItemDelegate):
         comp.setFilterMode(Qt.MatchFlag.MatchContains)
         comp.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         cb.setCompleter(comp)
-        return cb
+        # Note there is no snap-back to a listed code here, the way the unit
+        # picker has one. Typing a code the enum does not define is allowed on
+        # purpose - setModelData passes unmatched text straight through to
+        # coerce() - and it is what puts the red "code does not exist in the
+        # enum table" cells on screen. The picker cannot afford that, because
+        # its data is a row index rather than a value.
+        return select_all_on_focus(cb)
 
     def setEditorData(self, editor, index):
         val = index.data(Qt.ItemDataRole.EditRole)
