@@ -210,6 +210,36 @@ Neither output needs Python, PyQt6 or the `.bat` files on the target machine. Dr
 `icon.ico` into the `build` folder and it's embedded automatically. For a scripted
 build, pass the layout as an argument: `build_exe.bat 1` or `build_exe.bat 2`.
 
+### If your antivirus flags the .exe
+
+Windows Defender, and occasionally one or two smaller scanners, report the prebuilt
+`.exe` from the Releases page as `Trojan:Win32/Wacatac.B!ml` or something similarly
+generic. **It is a false positive.** At the time of writing 3 of 70 engines on
+VirusTotal flag it, all three by machine learning rather than by an actual signature
+(note the `!ml` suffix Microsoft puts on a guess), while 67 engines including
+Kaspersky, ESET, BitDefender, Avast, Symantec, Sophos, Trend Micro and CrowdStrike
+report it clean, and VirusTotal's own sandbox rates the observed behaviour clean at
+97% confidence.
+
+The cause is the shape of the file rather than anything it does. A PyInstaller
+single-file build is a small executable with a ~38 MB compressed archive glued to the
+end of it, which it unpacks into a temporary folder on every launch and deletes on
+exit. Unsigned, near-maximum entropy, self-extracting, deletes its own files
+afterwards, and brand new so no scanner has ever seen a copy before: that is exactly
+the profile heuristics are trained to distrust, and every legitimate PyInstaller app
+runs into it.
+
+For what it is worth, the editor opens no network connections at all - there is no
+networking code in the source - and writes nothing outside the workbook you open and
+the `.bak` beside it. If you would rather not take that on trust:
+
+- **Run it from source instead.** `quick_start.bat`, or `python br_editor.py`.
+- **Build the `.exe` yourself** with `build\build_exe.bat`. **One folder** mode is
+  flagged far less often than single file, because nothing is packed or unpacked.
+- **Check the current verdicts yourself.** The released binary is SHA256
+  `60d900c61f1de793ed23553467c344d8b19e8bb98ef092431eb6c48565f8089c` -
+  [see it on VirusTotal](https://www.virustotal.com/gui/file/60d900c61f1de793ed23553467c344d8b19e8bb98ef092431eb6c48565f8089c).
+
 ---
 
 ## Good to know
