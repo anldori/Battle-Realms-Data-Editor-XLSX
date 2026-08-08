@@ -6,12 +6,12 @@ All of the arithmetic lives in `brde/matchup.py`; this file only draws it, which
 is why the rules can be tested without a display.
 
 Colour is the shortest sentence on the page, so it means one thing throughout:
-green is good for the unit whose column it sits in, red is bad for it. In the
-armour section that reads as resistant or vulnerable, and in the matchup section
-as an attack that lands or one that bounces off. Because each matchup column
-holds what that unit does TO the other one, both readings point the same way and
-a column can be scanned top to bottom without stopping to work out whose side a
-number is on.
+green is good for the unit whose column it sits in, red is bad for it, and the
+deeper the shade the stronger the reading. In the armour section that reads as
+resistant or vulnerable, and in the matchup section as an attack that lands or
+one that bounces off. Because each matchup column holds what that unit does TO
+the other one, both readings point the same way and a column can be scanned top
+to bottom without stopping to work out whose side a number is on.
 """
 from __future__ import annotations
 
@@ -31,16 +31,25 @@ SECTION_BG = QColor(233, 238, 246)
 SECTION_FG = QColor(28, 43, 69)
 MUTED_FG = QColor(120, 132, 150)
 
-# Signed rank from matchup.rate() -> cell background. Positive is good for the
-# unit in that column, negative is bad, and -3 (immune) is deliberately not red:
-# it is not a weakness, it is the attack doing nothing at all.
+# Signed rank from matchup.rate() -> cell background. One ramp, and it runs the same
+# way at both ends: positive is good for the unit in that column, negative is bad, and
+# the further from zero the deeper the colour. Deep red is therefore the strongest
+# thing the page can say, and rank -3 always gets it.
+#
+# Rank -3 arrives from two directions and both deserve that weight. In the armour
+# section it is a multiplier of 2.0 or more, meaning the unit takes double damage or
+# worse - the Dragon Spearman's AMPiercing of 4.0, which is the example the whole
+# feature exists to explain. In the matchup section it is an attack the other unit is
+# immune to, which lands nothing and can never kill. Giving -3 its own calmer colour
+# for the second reading is what once painted the first one as if it barely mattered,
+# so that a 1.25 sat in red beside a 4.0 that did not.
 RANK_BG = {
     3: QColor(190, 231, 203),
     2: QColor(223, 243, 229),
     1: QColor(240, 249, 243),
     -1: QColor(253, 236, 230),
     -2: QColor(249, 213, 202),
-    -3: QColor(224, 229, 240),
+    -3: QColor(240, 176, 156),
 }
 
 
