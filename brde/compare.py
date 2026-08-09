@@ -13,7 +13,8 @@ import os
 
 import openpyxl
 
-from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
+from PyQt6.QtCore import (QAbstractTableModel, QModelIndex, Qt, QTimer,
+                          pyqtSignal)
 from PyQt6.QtGui import QBrush, QColor
 from PyQt6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QFileDialog,
                              QHBoxLayout, QHeaderView, QLabel, QLineEdit,
@@ -269,10 +270,23 @@ class CompareDialog(QDialog):
     applyRequested = pyqtSignal(list)                  # [(sheet,row,col,value)]
     highlightToggled = pyqtSignal(bool)
 
+    # Column widths. The three narrow columns hold a number or one short word
+    # and keep a fixed pixel width; the four text columns share whatever the
+    # window is not otherwise using, in these proportions.
+    FIXED_W = {1: 60, 2: 60, 6: 120}                   # Row, Key, Status
+    FLEX_W = {0: 21, 3: 19, 4: 21, 5: 21}              # Sheet, Column, both files
+    MIN_FLEX = 80
+
     def __init__(self, book, result: CompareResult, parent=None):
         super().__init__(parent)
         self.book = book
         self.result = result
+        self._applying_widths = False
+        self._user_sized = False
+        # Parented, so a dialog closed before it fires takes the timer with it.
+        self._settle_timer = QTimer(self)
+        self._settle_timer.setSingleShot(True)
+        self._settle_timer.timeout.connect(self._settle_columns)
         self.setWindowTitle('Compare - differences')
         self.resize(1100, 620)
         self.setSizeGripEnabled(True)
@@ -320,7 +334,8 @@ class CompareDialog(QDialog):
         self.cb_sheet.currentIndexChanged.connect(self._refilter)
         bar.addWidget(self.cb_sheet)
 
-        bar.addWidget(QLabel('   Status:'))
+        self.lbl_kind = QLabel('   Status:')
+        bar.addWidget(self.lbl_kind)
         self.cb_kind = QComboBox()
         self.cb_kind.addItem('All', '')
         self.cb_kind.addItem('Changed cells', CHANGED)
@@ -349,6 +364,20 @@ class CompareDialog(QDialog):
         hh.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         v.addWidget(self.tbl, 1)
         self._size_columns()
+
+        # "Status" only says something when the report holds more than one kind
+        # of difference. Two files with the same records differ in cell values
+        # alone, and then the column reads "changed" on every row and the filter
+        # has one usable entry, so both are hidden.
+        if len({d.kind for d in result.diffs}) < 2:
+            self.tbl.setColumnHidden(DiffModel.HEADERS.index('Status'), True)
+            self.lbl_kind.hide()
+            self.cb_kind.hide()
+            self._fit_columns()
+
+        # Connected last: hiding a column and the initial sizing above both
+        # emit sectionResized, and neither is the user dragging a divider.
+        hh.sectionResized.connect(self._on_section_resized)
 
         # ---- buttons
         row = QHBoxLayout()
@@ -382,9 +411,71 @@ class CompareDialog(QDialog):
         self.lbl_hint.setStyleSheet('color:#5a6b85;')
         v.addWidget(self.lbl_hint)
 
+    # ------------------------------------------------------------ geometry
     def _size_columns(self):
-        for c, w in enumerate((210, 60, 60, 190, 210, 210, 130)):
+        for c, w in self.FIXED_W.items():
             self.tbl.setColumnWidth(c, w)
+        self._fit_columns()
+
+    def _visible_cols(self):
+        return [c for c in range(len(DiffModel.HEADERS))
+                if not self.tbl.isColumnHidden(c)]
+
+    def _fit_columns(self):
+        """Hand the text columns the width the fixed ones leave over.
+
+        Sized twice: once now, so the window never paints a half-filled table,
+        and once after the event loop has caught up. The second pass is what
+        makes it exact - widening the columns can push the vertical scrollbar
+        out of the table, and the viewport is still the narrower size when
+        `resizeEvent` measures it, which leaves a scrollbar-wide empty strip.
+        """
+        if self._user_sized:
+            return
+        self._apply_widths()
+        self._settle_timer.start(0)
+
+    def _settle_columns(self):
+        if self._user_sized:
+            return
+        if sum(self.tbl.columnWidth(c) for c in self._visible_cols()) \
+                != self.tbl.viewport().width():
+            self._apply_widths()
+
+    def _apply_widths(self):
+        """One sizing pass over the flexible columns."""
+        avail = self.tbl.viewport().width()
+        for c, w in self.FIXED_W.items():
+            if not self.tbl.isColumnHidden(c):
+                avail -= w
+        flex = [c for c in sorted(self.FLEX_W) if not self.tbl.isColumnHidden(c)]
+        if not flex or avail <= self.MIN_FLEX * len(flex):
+            return
+        total = sum(self.FLEX_W[c] for c in flex)
+        self._applying_widths = True
+        used = 0
+        for c in flex[:-1]:
+            w = max(self.MIN_FLEX, avail * self.FLEX_W[c] // total)
+            self.tbl.setColumnWidth(c, w)
+            used += w
+        # the last one takes the rounding remainder, so no strip is left over
+        self.tbl.setColumnWidth(flex[-1], max(self.MIN_FLEX, avail - used))
+        self._applying_widths = False
+
+    def _on_section_resized(self, *_):
+        """Once a divider has been dragged, the widths are the user's to keep."""
+        if not self._applying_widths:
+            self._user_sized = True
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._fit_columns()
+
+    def showEvent(self, e):
+        # The viewport has no real width until the layout has run, so the
+        # sizing done in __init__ is against a placeholder. Redo it here.
+        super().showEvent(e)
+        self._fit_columns()
 
     # ------------------------------------------------------------ filtering
     def _refilter(self, *_):
