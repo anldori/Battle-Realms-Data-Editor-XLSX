@@ -163,6 +163,8 @@ inserted in the middle doesn't shift everything after it.
 
 The comparison includes your unsaved edits, and warns you before it starts.
 
+<img width="1442" height="892" alt="image" src="https://github.com/user-attachments/assets/1622ef4b-d4c4-446d-8881-c290dfd8bab3" />
+
 ---
 
 ## Features
