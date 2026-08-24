@@ -15,9 +15,7 @@ damaging the workbook.
 ### The easy way - download a ready-made build
 
 Grab the latest build from the
-[Releases page](https://github.com/anldori/Battle-Realms-Data-Editor-XLSX/releases),
-unzip it and run `BattleRealmsDataEditor.exe`. Nothing to install - no Python, no
-packages. If Windows Defender flags the download, see
+[Releases page](https://github.com/anldori/Battle-Realms-Data-Editor-XLSX/releases), nothing to install. If Windows Defender flags the download, see
 [If your antivirus flags the .exe](#if-your-antivirus-flags-the-exe).
 
 ### Running from source
