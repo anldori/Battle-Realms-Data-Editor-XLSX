@@ -12,9 +12,19 @@ damaging the workbook.
 
 ## Getting started
 
-### Windows - the easy way
+### The easy way - download a ready-made build
 
-Double-click **`quick_start.bat`**. It sets everything up for you:
+Grab the latest build from the
+[Releases page](https://github.com/anldori/Battle-Realms-Data-Editor-XLSX/releases),
+unzip it and run `BattleRealmsDataEditor.exe`. Nothing to install - no Python, no
+packages. If Windows Defender flags the download, see
+[If your antivirus flags the .exe](#if-your-antivirus-flags-the-exe).
+
+### Running from source
+
+Two ways, both from a copy of this repository.
+
+**1. Double-click `quick_start.bat`** (Windows). It sets everything up for you:
 
 1. **No Python installed?** It asks first. Answer `Y` and it downloads and installs
    Python 3.12 silently, per-user, so **no administrator rights are needed**. Answer
@@ -25,7 +35,7 @@ Double-click **`quick_start.bat`**. It sets everything up for you:
 You don't need to reopen the window or reboot afterwards - the script picks up the new
 Python straight away, and chooses the right installer for your CPU automatically.
 
-### Already have Python (3.9+)
+**2. By hand**, if you already have Python 3.9+:
 
 ```
 pip install -r requirements.txt
