@@ -287,10 +287,6 @@ class MainWindow(QMainWindow):
         tb.addAction(self.a_edits)
         tb.addAction(self.a_addrow)
         tb.addSeparator()
-        tb.addAction(self.a_detail)
-        tb.addAction(self.a_compare)
-        tb.addAction(self.a_matchup)
-        tb.addSeparator()
 
         self.chk_desc = QCheckBox('Show enum descriptions')
         self.chk_desc.setChecked(True)
