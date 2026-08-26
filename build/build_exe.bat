@@ -133,6 +133,30 @@ if defined ICONSRC set "ICON=--icon "%ICONSRC%" --add-data "%ICONSRC%;.""
 echo.
 
 REM ---- 5. build --------------------------------------------------------------
+REM
+REM  About the two excludes for PIL and lxml, which are worth more than a line.
+REM
+REM  They are openpyxl's OPTIONAL dependencies. openpyxl/drawing/image.py does
+REM  "from PIL import Image" and openpyxl/xml/ does "from lxml.etree import ...",
+REM  both wrapped in try/except ImportError, and --collect-submodules openpyxl
+REM  walks straight into them. PyInstaller cannot tell an optional import from a
+REM  required one, so whether they end up in the .exe depends on nothing but
+REM  whether the machine doing the build happens to have them installed. The
+REM  1.2.1 build did not; a later build on the same machine did, and gained
+REM  10.7 MB without a line of the program changing:
+REM
+REM      PIL binaries    5.7 MB   (PIL\_avif.pyd alone is 4.3 MB)
+REM      lxml binaries   3.5 MB
+REM      their .py files 1.9 MB   inside PYZ.pyz
+REM
+REM  Neither is used. Nothing in brde\ imports either one, the editor never
+REM  touches images in a workbook, and openpyxl falls back to the standard
+REM  library's xml.etree when lxml is missing - measured at 1.45s against 1.46s
+REM  to load the whole 201-sheet file, because read_only mode barely uses it.
+REM
+REM  Excluding them here keeps the size the same on every machine instead of
+REM  leaving it to what else happens to be in site-packages.
+REM
 echo Building %MODE:--=% ... this takes a couple of minutes.
 echo.
 
@@ -148,6 +172,8 @@ echo.
     --specpath "%WORK%" ^
     --paths "%ROOT%" ^
     --collect-submodules openpyxl ^
+    --exclude-module PIL ^
+    --exclude-module lxml ^
     --exclude-module tkinter ^
     --exclude-module pytest ^
     --exclude-module PyQt6.QtQml ^
