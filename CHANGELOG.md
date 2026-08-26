@@ -3,7 +3,34 @@
 Also shown in **Help ▸ About**, which is the authoritative copy - it is generated from
 `CHANGELOG` in `brde/about.py`.
 
-## 1.2.1 (current)
+## 1.3.0 (current)
+
+- **Colours look like colours.** Some columns in the file are not numbers at all -
+  they are the red, green and blue channels of one colour, and reading a team colour
+  off `0`, `0.449999988079071`, `0.920000016689301` is guesswork. A band of the colour
+  now runs along the bottom of those cells, exactly as wide as the columns that make
+  it, so it says which cells belong together instead of claiming to be any one of them.
+- **Pick a colour instead of typing three numbers.** Right-click a channel in the
+  grid, or double-click the colour on the detail page of a record, and the colour
+  dialog opens on the colour already there. Setting it writes all three channels as a
+  single undo step, and only the channels that actually changed - re-picking the
+  colour on screen edits nothing.
+- **A record that stores more than one colour sets them together.** A team colour and
+  its minimap colour are the same decision written twice, so right-clicking the key
+  cell of the record - `TeamColor` - offers *Pick colour (Colour + MiniMap)* and fills
+  in both from one dialog. The entry names every colour it will overwrite before you
+  click it.
+- The detail page of a record that has colours opens with them: a bar of the colour
+  itself with its hex code across it. The channels stay below as ordinary editable
+  fields, so nothing is hidden.
+- Transparency is shown rather than guessed at. The four beam colours carry an alpha
+  channel, and their swatches are drawn over a checkerboard so a faint colour cannot
+  be mistaken for a blank one.
+- The colour columns are found from the data, not from a hard-coded list, so a mod
+  that adds a colour to a sheet gets the preview and the picker for free. Channels
+  stored as 0..255 bytes are read and written as bytes, not silently rescaled.
+
+## 1.2.1
 
 - **The comparison was picking a weapon the fight never uses.** It scored every
   weapon a unit carried together and reported whichever landed the most damage, with

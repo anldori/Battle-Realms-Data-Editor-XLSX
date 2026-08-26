@@ -71,7 +71,7 @@ BOOL_TABLE = EnumTable('@bool', [(-1, 'None (-1)', ''),
 
 class SheetData:
     __slots__ = ('name', 'headers', 'rows', 'col_enum', 'self_enum',
-                 'first_data_row', 'ncols')
+                 'first_data_row', 'ncols', 'colours', 'col_colour')
 
     def __init__(self, name, headers, rows):
         self.name = name
@@ -79,6 +79,8 @@ class SheetData:
         self.rows = rows                        # list[list], may contain None
         self.col_enum = {}                      # col_index -> enum name / '@bool'
         self.self_enum = None
+        self.colours = []                       # [schema.ColourGroup]
+        self.col_colour = {}                    # col_index -> its ColourGroup
         self.first_data_row = 2                 # row 1 is the header (1-based)
         self.ncols = len(headers)
 
@@ -161,6 +163,7 @@ class BRWorkbook:
                                                  sd.self_enum)
                     if e:
                         sd.col_enum[ci] = e
+            _attach_colours(sd)
             self.sheets[name] = sd
             self.sheet_order.append(name)
 
@@ -189,6 +192,31 @@ class BRWorkbook:
                     fallback[se] = name
             self._enum2sheet = {**fallback, **primary}
         return self._enum2sheet.get(ename)
+
+    def colour_group(self, sheet: str, col: int):
+        """The ColourGroup this column is a channel of, or None."""
+        sd = self.sheets.get(sheet)
+        return sd.col_colour.get(col) if sd else None
+
+    def colour_at(self, sheet: str, row: int, group):
+        """One record's colour as (r, g, b, a) floats 0..1, or None.
+
+        None when any of red/green/blue is blank or not a number, which is what
+        a half-filled row looks like: there is no colour to show yet. A missing
+        alpha column, or a blank alpha cell, reads as fully opaque.
+        """
+        rgb = []
+        for col in (group.red, group.green, group.blue):
+            x = group.decode(self.value(sheet, row, col))
+            if x is None:
+                return None
+            rgb.append(x)
+        a = 1.0
+        if group.alpha is not None:
+            av = group.decode(self.value(sheet, row, group.alpha))
+            if av is not None:
+                a = av
+        return (rgb[0], rgb[1], rgb[2], a)
 
     def enum_for(self, sheet: str, col: int):
         sd = self.sheets.get(sheet)
@@ -326,6 +354,16 @@ class BRWorkbook:
         self.original.clear()
         self.path = dest
         return dest
+
+
+def _attach_colours(sd: SheetData):
+    """Find the sheet's colour groups and work out what scale they are stored on."""
+    sd.colours = schema.colour_groups(sd.headers)
+    for g in sd.colours:
+        vals = [r[c] for r in sd.rows for c in g.columns if c < len(r)]
+        g.scale = schema.colour_scale(vals)
+        for c in g.columns:
+            sd.col_colour[c] = g
 
 
 def _unescape(s: str) -> str:

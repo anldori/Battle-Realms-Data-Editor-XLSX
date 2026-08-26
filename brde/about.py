@@ -19,7 +19,38 @@ TAGLINE = ('Editor for Battle Realms game data in the newer Battle Realms.xlsx '
 
 # (version, when, [changes]) - newest first.
 CHANGELOG = [
-    ('1.2.1', 'current', [
+    ('1.3.0', 'current', [
+        '<b>Colours look like colours.</b> Some columns in the file are not '
+        'numbers at all - they are the red, green and blue channels of one '
+        'colour, and reading a team colour off <code>0</code>, '
+        '<code>0.449999988079071</code>, <code>0.920000016689301</code> is '
+        'guesswork. A band of the colour now runs along the bottom of those '
+        'cells, exactly as wide as the columns that make it, so it says which '
+        'cells belong together instead of claiming to be any one of them.',
+        '<b>Pick a colour instead of typing three numbers.</b> Right-click a '
+        'channel in the grid, or double-click the colour on the detail page '
+        'of a record, and the colour dialog opens on the colour already '
+        'there. Setting it writes all three channels as a single undo step, '
+        'and only the channels that actually changed - re-picking the colour '
+        'on screen edits nothing.',
+        '<b>A record that stores more than one colour sets them together.</b> '
+        'A team colour and its minimap colour are the same decision written '
+        'twice, so right-clicking the key cell of the record - '
+        '<code>TeamColor</code> - offers <i>Pick colour (Colour + MiniMap)</i> '
+        'and fills in both from one dialog. The entry names every colour it '
+        'will overwrite before you click it.',
+        'The detail page of a record that has colours opens with them: a bar '
+        'of the colour itself with its hex code across it. The channels stay '
+        'below as ordinary editable fields, so nothing is hidden.',
+        'Transparency is shown rather than guessed at. The four beam colours '
+        'carry an alpha channel, and their swatches are drawn over a '
+        'checkerboard so a faint colour cannot be mistaken for a blank one.',
+        'The colour columns are found from the data, not from a hard-coded '
+        'list, so a mod that adds a colour to a sheet gets the preview and the '
+        'picker for free. Channels stored as 0..255 bytes are read and written '
+        'as bytes, not silently rescaled.',
+    ]),
+    ('1.2.1', '', [
         '<b>The comparison was picking a weapon the fight never uses.</b> It '
         'scored every weapon a unit carried together and reported whichever '
         'landed the most damage, with no regard for how far away that weapon '

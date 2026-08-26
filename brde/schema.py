@@ -375,3 +375,131 @@ def enum_to_data_sheet(ename: str, data_sheets, enums: dict):
         if sheet_self_enum(s, enums) == ename:
             return s
     return None
+
+
+# ------------------------------------------------------------- colour columns
+# A colour is never one column. It is three or four sitting side by side, and the
+# workbook writes them two different ways: Data_Beams spells the channel out
+# (HeadColorRed), Data_TeamColors uses a single letter (R). Both are matched on
+# whole name tokens, so Data_Abilities.RedirectDamageFromSourceToTarget and
+# Data_WorldVariables.RedHealthThreshold - which merely start with "Red" - are
+# not mistaken for one.
+_CHANNEL_WORDS = {'red': 'r', 'green': 'g', 'blue': 'b', 'alpha': 'a'}
+_CHANNEL_LETTERS = {'r', 'g', 'b', 'a'}
+
+
+class ColourGroup:
+    """The columns of one sheet that together make one colour.
+
+    `red`/`green`/`blue` are column indices and always present; `alpha` is a
+    column index or None. `scale` is what the stored numbers mean: 1.0 when the
+    channels are 0..1 floats, which is what the vanilla file uses everywhere,
+    255.0 when a mod stores them as bytes.
+    """
+
+    __slots__ = ('label', 'red', 'green', 'blue', 'alpha', 'scale')
+
+    def __init__(self, label, red, green, blue, alpha=None, scale=1.0):
+        self.label = label
+        self.red = red
+        self.green = green
+        self.blue = blue
+        self.alpha = alpha
+        self.scale = scale
+
+    @property
+    def columns(self):
+        cols = [self.red, self.green, self.blue]
+        if self.alpha is not None:
+            cols.append(self.alpha)
+        return cols
+
+    def channel(self, col):
+        """'r', 'g', 'b', 'a' - or None when the column is not in this group."""
+        for name in ('red', 'green', 'blue', 'alpha'):
+            if getattr(self, name) == col:
+                return name[0]
+        return None
+
+    def decode(self, value):
+        """A stored channel value as a 0..1 float, or None if it is not a number."""
+        if value is None or isinstance(value, bool) or \
+                not isinstance(value, (int, float)):
+            return None
+        x = float(value) / self.scale
+        return 0.0 if x < 0.0 else (1.0 if x > 1.0 else x)
+
+    def encode(self, x):
+        """A 0..1 float in the form this sheet stores it."""
+        if self.scale != 1.0:
+            return int(round(x * self.scale))
+        # Four decimals is finer than the 1/255 the picker works in, and keeps
+        # the written number readable rather than a float32 artefact such as
+        # 0.449999988079071.
+        return round(float(x), 4)
+
+    def __repr__(self):
+        return (f'ColourGroup({self.label!r}, r={self.red}, g={self.green}, '
+                f'b={self.blue}, a={self.alpha}, scale={self.scale})')
+
+
+def _channel_candidates(header):
+    """[(prefix, suffix, channel)] the header could be a channel of."""
+    toks = split_tokens(header)
+    out = []
+    for i, t in enumerate(toks):
+        low = t.lower()
+        if low in _CHANNEL_WORDS:
+            ch = _CHANNEL_WORDS[low]
+            style = 'word'
+        elif low in _CHANNEL_LETTERS and len(t) == 1:
+            ch = low
+            style = 'letter'
+        else:
+            continue
+        out.append((''.join(toks[:i]), ''.join(toks[i + 1:]), ch, style))
+    return out
+
+
+def colour_groups(headers):
+    """Every colour a sheet's headers describe, in column order.
+
+    A group is only accepted once red, green and blue are all present under the
+    same prefix and suffix - Data_Decals has a lone Alpha column and no colour,
+    and it stays a plain number.
+    """
+    buckets, order = {}, []
+    for ci, head in enumerate(headers):
+        if not head:
+            continue
+        for pre, suf, ch, style in _channel_candidates(head):
+            key = (pre, suf, style)
+            b = buckets.setdefault(key, {})
+            if key not in order:
+                order.append(key)
+            b.setdefault(ch, ci)
+
+    out, taken = [], set()
+    for key in order:
+        b = buckets[key]
+        if not {'r', 'g', 'b'} <= set(b):
+            continue
+        cols = [b['r'], b['g'], b['b']] + ([b['a']] if 'a' in b else [])
+        if any(c in taken for c in cols):
+            continue
+        taken.update(cols)
+        pre, suf, _style = key
+        out.append(ColourGroup(pre or suf or 'Colour',
+                               b['r'], b['g'], b['b'], b.get('a')))
+    out.sort(key=lambda g: g.red)
+    return out
+
+
+def colour_scale(values):
+    """1.0 when the channels are stored as 0..1 floats, 255.0 when 0..255."""
+    top = 0.0
+    for v in values:
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            continue
+        top = max(top, abs(float(v)))
+    return 255.0 if top > 1.0 else 1.0

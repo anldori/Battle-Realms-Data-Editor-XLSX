@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QFileDialog, QHeaderView,
 
 from . import about, compare, core, detail, matchup, matchup_ui
 from .model import (EnumDelegate, MultiSetCommand, RowFilter, SetValueCommand,
-                    SheetModel, coerce)
+                    SheetModel, ask_colour, coerce, pick_label)
 
 APP_NAME = 'Battle Realms Data Editor'
 ORG = 'BRDE'
@@ -102,6 +102,18 @@ RECORD DETAILS  (Record > Find record..., Ctrl+I)
 RIGHT-CLICK ON AN ENUM CELL
   "Go to Data_..."      opens the exact record being referenced.
   "Open code table..."  shows the full list of codes.
+
+COLOURS
+  A colour is stored as separate columns of numbers - R, G and B, each from 0 to
+  1 - so a BAND of the colour runs under them, as wide as the columns that make
+  it. Hover any of those cells for the hex code.
+  Right-click one and choose "Pick ... colour..." to set the whole colour from a
+  colour picker; it counts as a single undo step.
+  Right-click the record's KEY CELL instead - TeamColor, for example - and one
+  pick fills in every colour the record has. Data_TeamColors keeps the team
+  colour and the minimap colour separately, and they are meant to match.
+  On a record's detail page the colours are listed at the top, each as a bar of
+  the colour with its hex code. Double-click one to pick a new colour.
 
 COMPARING TWO FILES
   Compare > Compare with another file...  (Ctrl+D)
@@ -863,6 +875,7 @@ class MainWindow(QMainWindow):
             d = detail.DetailWindow(self.book, self)
             d.jumpRequested.connect(self._on_detail_jump)
             d.editRequested.connect(self._on_detail_edit)
+            d.colourRequested.connect(self._apply_colour)
             d.finished.connect(self._on_detail_closed)
             self._detail_dlg = d
         self._detail_dlg.show()
@@ -1168,6 +1181,18 @@ class MainWindow(QMainWindow):
                 a0b = m.addAction('Compare this unit with...\tCtrl+Shift+U')
                 a0b.triggered.connect(self.on_matchup_row)
             m.addSeparator()
+        # A channel cell picks its own colour; the record's key cell picks every
+        # colour the record has, which is what Data_TeamColors wants - its team
+        # colour and its minimap colour are one decision stored twice, and
+        # setting them separately is two dialogs to say one thing.
+        groups = self.model.sd.colours if c == 0 else None
+        one = self.book.colour_group(sheet, c)
+        if one:
+            groups = [one]
+        if groups:
+            a_col = m.addAction(pick_label(groups))
+            a_col.triggered.connect(lambda: self._pick_colour(sheet, r, groups))
+            m.addSeparator()
         if tbl and tbl.name != '@bool' and isinstance(val, int):
             target = self.book.data_sheet_for_enum(tbl.name)
             desc = tbl.code2desc.get(val, '?')
@@ -1189,6 +1214,26 @@ class MainWindow(QMainWindow):
         a6.triggered.connect(
             lambda: self.ed_filter.setText(str(val) if val is not None else ''))
         m.exec(self.tbl.viewport().mapToGlobal(pos))
+
+    def _pick_colour(self, sheet, row, groups):
+        """Set one or more whole colours from the dialog, as one undo step."""
+        changes = ask_colour(self, self.book, sheet, row, groups)
+        if changes is None:
+            return
+        if not changes:
+            self.lbl_status.setText('That is the colour already there - nothing '
+                                    'changed.')
+            return
+        self._apply_colour(sheet, row, groups, changes)
+
+    def _apply_colour(self, sheet, row, groups, changes):
+        if not isinstance(groups, (list, tuple)):
+            groups = [groups]
+        model = self._model_for(sheet)
+        cells = [(row, col, model.raw(row, col), v) for col, v in changes]
+        name = ' + '.join(g.label for g in groups)
+        self.undo.push(MultiSetCommand(
+            model, cells, f'{sheet}.{name} [{row + 2}]: colour'))
 
     def _jump_to_record(self, sheet, code):
         sd = self.book.sheets[sheet]

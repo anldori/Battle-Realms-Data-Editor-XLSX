@@ -26,6 +26,9 @@ from PyQt6.QtWidgets import (QAbstractItemView, QComboBox, QCompleter, QDialog,
                              QSplitter, QTableView, QVBoxLayout, QWidget,
                              QStyledItemDelegate)
 
+from .model import (ask_colour, colour_text, pick_label, qcolour,
+                    readable_on, swatch)
+
 SECTION_BG = QColor(233, 238, 246)
 SECTION_FG = QColor(28, 43, 69)
 LINK_FG = QColor(45, 108, 223)
@@ -146,6 +149,25 @@ class Note:
         self.value = value
         self.indent = indent
         self.link = link
+
+
+class Swatch:
+    """A colour preview line, pointing at the columns that make one colour.
+
+    Not a Field: a colour is three or four cells at once, so it is set through
+    the colour dialog rather than typed. The channels themselves stay on the
+    page as ordinary editable Fields.
+    """
+
+    __slots__ = ('label', 'sheet', 'row', 'group', 'indent', 'link')
+
+    def __init__(self, label, sheet, row, group, indent=0):
+        self.label = label
+        self.sheet = sheet
+        self.row = row
+        self.group = group
+        self.indent = indent
+        self.link = None
 
 
 class Section:
@@ -727,6 +749,15 @@ def build_sections(book, sheet, row):
         used.add(c)
         return Field(name, sheet, row, c, indent=indent)
 
+    # Colours come first: on Data_TeamColors and Data_Beams they are the point
+    # of the record, and the channels are unreadable as bare numbers. The
+    # channel columns are deliberately NOT marked used - they still appear
+    # below as editable fields, so nothing is hidden.
+    if sd.colours:
+        sections.append(Section('Colours',
+                                [Swatch(g.label, sheet, row, g)
+                                 for g in sd.colours]))
+
     for title, spec in PROFILES.get(sheet, []):
         items = []
         if callable(spec):
@@ -938,6 +969,35 @@ class DetailModel(QAbstractTableModel):
                 return f
             return None
 
+        if isinstance(it, Swatch):
+            col = qcolour(self.book.colour_at(it.sheet, it.row, it.group))
+            if role == Qt.ItemDataRole.DisplayRole:
+                if c == 0:
+                    return '    ' * it.indent + it.label
+                return colour_text(col, it.group) if col else '(not set)'
+            if c == 1 and col is not None:
+                if role == Qt.ItemDataRole.BackgroundRole:
+                    return QBrush(col)
+                # The bar behind the text is the colour as it actually
+                # composites, so a low alpha all but disappears - which is
+                # honest but unreadable. The swatch draws the same colour over a
+                # checkerboard, so "faint" and "not set" cannot be confused.
+                if role == Qt.ItemDataRole.DecorationRole:
+                    return swatch(col, 30, 16)
+                if role == Qt.ItemDataRole.ForegroundRole:
+                    return QBrush(readable_on(col))
+                if role == Qt.ItemDataRole.FontRole:
+                    f = QFont()
+                    f.setBold(True)
+                    return f
+            if role == Qt.ItemDataRole.ToolTipRole:
+                chans = ', '.join(_header(self.book, it.sheet, x)
+                                  for x in it.group.columns)
+                return (f'{it.sheet}  (row {it.row + 2})\n'
+                        f'{chans}\n'
+                        'Double-click to pick a colour.')
+            return None
+
         if isinstance(it, Note):
             if role == Qt.ItemDataRole.DisplayRole:
                 return ('    ' * it.indent + it.label) if c == 0 else str(it.value)
@@ -1057,6 +1117,8 @@ class DetailWindow(QDialog):
 
     jumpRequested = pyqtSignal(str, int, int)              # sheet, row, col
     editRequested = pyqtSignal(str, int, int, object)      # sheet, row, col, value
+    # sheet, row, ColourGroup, [(col, value)] - one undo step for a whole colour
+    colourRequested = pyqtSignal(str, int, object, object)
 
     def __init__(self, book, parent=None):
         super().__init__(parent)
@@ -1199,11 +1261,19 @@ class DetailWindow(QDialog):
         self.show_record(sheet, row, remember=False)
 
     def _on_double_click(self, index):
+        it = self.model.item(index.row())
+        if isinstance(it, Swatch):
+            self._pick_colour(it)
+            return
         if index.column() != 0:
             return
-        it = self.model.item(index.row())
         if it is not None and getattr(it, 'link', None):
             self.show_record(*it.link)
+
+    def _pick_colour(self, it):
+        changes = ask_colour(self, self.book, it.sheet, it.row, it.group)
+        if changes:
+            self.colourRequested.emit(it.sheet, it.row, it.group, changes)
 
     def _show_in_grid(self):
         if self._current:
@@ -1215,6 +1285,9 @@ class DetailWindow(QDialog):
         if it is None or isinstance(it, Section):
             return
         m = QMenu(self)
+        if isinstance(it, Swatch):
+            a0 = m.addAction(pick_label(it.group))
+            a0.triggered.connect(lambda: self._pick_colour(it))
         if getattr(it, 'link', None):
             a = m.addAction('Open this record')
             a.triggered.connect(lambda: self.show_record(*it.link))
