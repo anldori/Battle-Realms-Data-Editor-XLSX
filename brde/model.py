@@ -7,8 +7,14 @@ from PyQt6.QtCore import (QAbstractTableModel, QEvent, QModelIndex, QObject,
                           QSortFilterProxyModel, Qt, pyqtSignal)
 from PyQt6.QtGui import (QBrush, QColor, QFont, QPainter, QPixmap,
                          QUndoCommand)
-from PyQt6.QtWidgets import (QColorDialog, QComboBox, QCompleter,
-                             QStyledItemDelegate, QLineEdit)
+from PyQt6.QtWidgets import (QComboBox, QCompleter, QStyledItemDelegate,
+                             QLineEdit)
+
+# readable_on lives with the dialog because it is a painting rule, and is
+# re-exported here: model.py is the lowest Qt layer and brde.detail already
+# reaches for it by that name.
+from .colour_dialog import (PALETTE_MAX, PaletteColour,  # noqa: F401
+                            pick_colour, readable_on)
 
 EDITED_BG = QColor(255, 243, 205)
 EDITED_FG = QColor(140, 90, 0)
@@ -343,16 +349,6 @@ def colour_text(colour, group=None):
     return hexed
 
 
-def readable_on(colour):
-    """Black or white, whichever stays legible on top of `colour`."""
-    r, g, b = colour.redF(), colour.greenF(), colour.blueF()
-    # Rec. 709 luma, blended onto white so a transparent colour is judged as it
-    # is actually painted rather than as its opaque self.
-    a = colour.alphaF()
-    lum = ((0.2126 * r + 0.7152 * g + 0.0722 * b) * a) + (1.0 - a)
-    return QColor(0, 0, 0) if lum > 0.55 else QColor(255, 255, 255)
-
-
 def short_label(group):
     """The group's name with the word "colour" taken off the end.
 
@@ -410,6 +406,48 @@ def colour_edits(book, sheet, row, group, colour):
     return out
 
 
+def sheet_palette(book, sheet, limit=None):
+    """The colours the sheet already holds, in row order, without repeats.
+
+    Data_TeamColors is eleven colours that have to be told apart from each
+    other on a minimap, so the useful question when setting one is not "is this
+    a nice blue" but "is this too close to the blue two rows down". The list
+    goes into the dialog's own palette slots, where it answers that by sitting
+    next to the colour being picked.
+
+    Every group of the sheet is read, not only the one being set: on
+    Data_TeamColors the team colour and its minimap colour are the same value
+    twice, and the repeat is dropped here rather than filling half the palette
+    with duplicates.
+    """
+    sd = book.sheets.get(sheet)
+    if sd is None or not sd.colours:
+        return []
+    head = sd.headers[0] if sd.headers else 'row'
+    out, seen = [], set()
+    for row in range(len(sd.rows)):
+        key = book.value(sheet, row, 0)
+        name = f'{head} {key}' if key is not None else f'{head} ?'
+        # A row is labelled by the group only when the row holds more than one
+        # colour to tell apart. Data_TeamColors stores its team colour and its
+        # minimap colour identically, so the second is dropped as a duplicate
+        # and naming the survivor "Colour" would be noise; a Data_Beams row is
+        # four different colours and each of them needs saying which it is.
+        here = []
+        for g in sd.colours:
+            c = qcolour(book.colour_at(sheet, row, g))
+            if c is None or c.rgba() in seen:
+                continue
+            seen.add(c.rgba())
+            here.append((g, c))
+        for g, c in here:
+            label = name if len(here) == 1 else f'{name}  {g.label}'
+            out.append(PaletteColour(c, f'{label}  (row {row + 2})', row))
+            if limit is not None and len(out) >= limit:
+                return out
+    return out
+
+
 def ask_colour(parent, book, sheet, row, groups, title=None):
     """Show the colour dialog and apply the answer to one or more colours.
 
@@ -430,14 +468,17 @@ def ask_colour(parent, book, sheet, row, groups, title=None):
     # groups without one simply ignore it.
     current = (qcolour(book.colour_at(sheet, row, groups[0]))
                or QColor(255, 255, 255))
-    opts = (QColorDialog.ColorDialogOption.ShowAlphaChannel
-            if any(g.alpha is not None for g in groups)
-            else QColorDialog.ColorDialogOption(0))
+    alpha = any(g.alpha is not None for g in groups)
     if title is None:
         name = ' + '.join(short_label(g) or g.label for g in groups)
-        title = f'{name} - {sheet}'
-    picked = QColorDialog.getColor(current, parent, title, opts)
-    if not picked.isValid():
+        title = f'{name}  -  {sheet}'
+    # The whole sheet's colours go in beside the one being picked, with this
+    # row ringed among them: what a team colour has to be is different from
+    # the other ten, and that cannot be judged against nothing.
+    picked = pick_colour(parent, current,
+                         sheet_palette(book, sheet, PALETTE_MAX), row,
+                         alpha, title)
+    if picked is None:
         return None
     out = []
     for g in groups:

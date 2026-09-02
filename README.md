@@ -189,7 +189,7 @@ The comparison includes your unsaved edits, and warns you before it starts.
 | **Edited cells highlighted** | Edits turn yellow; hover to see the original value. `Ctrl+E` lists every edit and jumps to it. |
 | **Jump to referenced record** | Right-click an enum cell → "Go to Data_Weapons" or "Open code table Enum_WeaponType". |
 | **Invalid code warning** | Codes that don't exist in the enum table are shown in red. |
-| **Colour preview and picker** | Colours are stored as separate `R`/`G`/`B` columns of floats, so a band of the colour runs under them, as wide as the columns that make it. Right-click to open a colour picker that sets the whole colour in a single undoable step - on the record's key cell it sets every colour the record has at once. |
+| **Colour preview and picker** | Colours are stored as separate `R`/`G`/`B` columns of floats, so a band of the colour runs under them, as wide as the columns that make it. Right-click to open a colour picker that sets the whole colour in a single undoable step - on the record's key cell it sets every colour the record has at once. The picker shows the colours already in the sheet beside the one being set, with the row being edited ringed among them, and says so when a pick lands close enough to another row to be confused with it. |
 | **Copy / Paste** | `Ctrl+C` / `Ctrl+V` over a range, tab-separated so it round-trips with Excel. |
 | **Add row** | `Ctrl+Shift+N` appends a row to the current sheet. |
 | **Quick sheet switching** | `Ctrl+P` to type a sheet name, or use the searchable list on the left. |

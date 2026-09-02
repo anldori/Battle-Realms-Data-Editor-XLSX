@@ -19,7 +19,35 @@ TAGLINE = ('Editor for Battle Realms game data in the newer Battle Realms.xlsx '
 
 # (version, when, [changes]) - newest first.
 CHANGELOG = [
-    ('1.3.0', 'current', [
+    ('1.4.0', 'current', [
+        '<b>A colour picker built for this file.</b> Picking a colour used to '
+        'open whatever panel the system supplies - on Windows the grid of 48 '
+        'fixed colours with a "Define Custom Colors" flap behind it, unchanged '
+        'since the nineties. The editor now brings its own: the picking '
+        'surface takes the whole left half, the hex box is a field rather '
+        'than a corner marked "HTML", and a screen picker lifts a colour '
+        'straight off a screenshot of the game.',
+        '<b>The colours already in the sheet are shown beside the one being '
+        'picked</b>, with the row being edited ringed among them. Setting a '
+        'team colour is not the question "is this a nice blue"; it is "will '
+        'this be told apart from the other ten on a minimap", and that can '
+        'only be answered next to the answer. Clicking one takes it.',
+        '<b>It says so when two colours are about to be confused.</b> A pick '
+        'that lands close to another row names that row, quietly, under the '
+        'palette. The threshold sits just under the closest pair the game '
+        'itself ships - TeamColor 6 and TeamColor 8 - so the vanilla file is '
+        'silent and a mod is warned rather than stopped.',
+        'The colour in the file sits beside the colour replacing it, so an '
+        'overwrite is visible while it is being made rather than afterwards. '
+        'Clicking the old half puts it back.',
+        'Transparency is no longer at the mercy of the platform. The system '
+        'panel has no alpha channel at all, so the four <code>Data_Beams</code> '
+        'colours could lose theirs on the way through it. Alpha now has a '
+        'slider of its own over a checkerboard, and a channel box - never a '
+        'hex, which Qt writes as #AARRGGBB and the rest of the world reads as '
+        '#RRGGBBAA.',
+    ]),
+    ('1.3.0', '', [
         '<b>Colours look like colours.</b> Some columns in the file are not '
         'numbers at all - they are the red, green and blue channels of one '
         'colour, and reading a team colour off <code>0</code>, '
