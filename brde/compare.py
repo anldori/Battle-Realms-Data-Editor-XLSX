@@ -395,6 +395,12 @@ class CompareDialog(QDialog):
         b_take.setToolTip('Copy the other file\'s value into this file as a normal,\n'
                           'undoable edit. Save with Ctrl+S to write it out.')
         b_take.clicked.connect(self._take_selected)
+        # The report itself is worth having against a read-only file - seeing
+        # what an old .dat holds that the workbook does not is most of the point
+        # of opening one - but there is nowhere to copy a value into.
+        if self.book.read_only:
+            b_take.setEnabled(False)
+            b_take.setToolTip('This file was opened read-only.')
         row.addWidget(b_take)
 
         b_csv = QPushButton('Export to CSV...')

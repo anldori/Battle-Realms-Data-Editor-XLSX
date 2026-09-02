@@ -8,6 +8,9 @@ Browse and edit every sheet with real names instead of raw code numbers, look up
 unit's full stats on one page, compare your mod against vanilla, and save without
 damaging the workbook.
 
+It also **opens the old `.dat` files, read-only**, so a mod written before the game
+changed format can still be read.
+
 ---
 
 ## Getting started
@@ -49,7 +52,7 @@ python br_editor.py "C:\path\to\Battle Realms.xlsx"  # open a file directly
 The app starts on a welcome screen with nothing loaded. Open a file in any of three
 ways:
 
-- **File ▸ Open file…** (`Ctrl+O`)
+- **File ▸ Open workbook…** (`Ctrl+O`)
 - The **"Open Battle Realms.xlsx…"** button on the welcome screen
 - **Drag and drop** a `.xlsx` file onto the window
 
@@ -58,6 +61,19 @@ on the welcome screen.
 
 > Keep a backup copy of the original `Battle Realms.xlsx` before you start modding.
 > The editor also writes a `.bak` next to the file every time you save.
+
+### Opening the old `.dat` file
+
+**File ▸ Open old .dat file…**, or the second button on the welcome screen, reads
+`Battle Realms.dat` - the format the spreadsheet replaced. Useful for reading a mod
+made before the game changed format, or for seeing what the old file held that yours
+does not.
+
+**It opens read-only.** Everything that reads works on it: browsing sheets, dropdowns
+instead of code numbers, `Ctrl+I` record details, `Ctrl+U` unit comparison, colour
+previews, and `Ctrl+D` to diff it against a workbook. Nothing in it can be edited or
+saved - the title bar shows `[read-only]`, editing is off, and a `.dat` in **Open
+recent** is labelled so you know before you open it.
 
 <img width="1442" height="892" alt="image" src="https://github.com/user-attachments/assets/e84cf1a9-20d9-442e-9683-19524d830d69" />
 
@@ -171,6 +187,10 @@ inserted in the middle doesn't shift everything after it.
 
 The comparison includes your unsaved edits, and warns you before it starts.
 
+This also works with a `.dat` open, which is the quickest way to see what the old file
+held that your workbook does not. **Take other value** is disabled there, since a
+`.dat` cannot be written to.
+
 <img width="1442" height="892" alt="image" src="https://github.com/user-attachments/assets/1622ef4b-d4c4-446d-8881-c290dfd8bab3" />
 
 ---
@@ -179,6 +199,7 @@ The comparison includes your unsaved edits, and warns you before it starts.
 
 | Feature | What it does |
 | --- | --- |
+| **Reads the old `.dat`** | **File ▸ Open old .dat file…** opens `Battle Realms.dat` read-only, with everything the editor normally shows: dropdowns, record details, unit comparison, colour previews. |
 | **Record details** | `Ctrl+I`. Search a unit or building by name and read every stat on one page, weapon damage included. Editable in place. |
 | **Unit vs unit** | `Ctrl+U`. Two units side by side, with the counter worked out from damage class against armour multiplier, and techniques applied. |
 | **Dropdowns instead of raw numbers** | 546 reference columns are detected automatically. Pick `17 - WEAPON_BOWBASH` from a list instead of looking the number up by hand. |
@@ -202,7 +223,7 @@ The comparison includes your unsaved edits, and warns you before it starts.
 
 | Menu | Contents |
 | --- | --- |
-| **File** | Open file… · Open recent ▸ · Save · Save As… · Close file · Exit |
+| **File** | Open workbook… (`Ctrl+O`) · Open old .dat file (read-only)… · Open recent ▸ · Save · Save As… · Close file · Exit |
 | **Edit** | Undo · Redo · Copy · Paste · Clear cells · Revert to original · Add row |
 | **View** | Show enum descriptions · Filter rows · Go to sheet… · List edited cells |
 | **Record** | Find record… (`Ctrl+I`) · Details for the selected row (`Ctrl+Shift+I`) |

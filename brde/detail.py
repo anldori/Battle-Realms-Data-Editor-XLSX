@@ -58,10 +58,17 @@ def _header(book, sheet, col):
 
 
 def _col(book, sheet, name):
-    """Column index by header name, or None."""
+    """Column index by header name, or None.
+
+    A missing sheet answers None exactly like a missing column, and every caller
+    already knows how to skip a lookup it cannot make. That matters beyond
+    tidiness: the profiles name sheets that a particular file need not have -
+    an old .dat has no `Data_UnitAndInnateAbilities` at all - and a KeyError
+    here took down the whole detail page rather than dropping one section.
+    """
     try:
         return book.sheets[sheet].headers.index(name)
-    except ValueError:
+    except (KeyError, ValueError):
         return None
 
 
@@ -1047,7 +1054,8 @@ class DetailModel(QAbstractTableModel):
         if isinstance(it, Section):
             return Qt.ItemFlag.NoItemFlags
         base = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
-        if isinstance(it, Field) and index.column() == 1:
+        if (isinstance(it, Field) and index.column() == 1
+                and not self.book.read_only):
             return base | Qt.ItemFlag.ItemIsEditable
         return base
 
@@ -1271,6 +1279,10 @@ class DetailWindow(QDialog):
             self.show_record(*it.link)
 
     def _pick_colour(self, it):
+        # Both ways in - a double click on the swatch and the context menu -
+        # come through here, so the read-only book is stopped once.
+        if self.book.read_only:
+            return
         changes = ask_colour(self, self.book, it.sheet, it.row, it.group)
         if changes:
             self.colourRequested.emit(it.sheet, it.row, it.group, changes)
@@ -1285,7 +1297,7 @@ class DetailWindow(QDialog):
         if it is None or isinstance(it, Section):
             return
         m = QMenu(self)
-        if isinstance(it, Swatch):
+        if isinstance(it, Swatch) and not self.book.read_only:
             a0 = m.addAction(pick_label(it.group))
             a0.triggered.connect(lambda: self._pick_colour(it))
         if getattr(it, 'link', None):
