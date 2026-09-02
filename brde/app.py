@@ -57,6 +57,14 @@ QMenuBar::item:selected { background: #2d6cdf; color: white; }
     border: none; border-radius: 6px; padding: 12px 30px;
 }
 #BigButton:hover { background: #2559b8; }
+/* The second way in, for the old .dat. Outlined rather than filled: it is a
+   real offer and has to be visible on the welcome screen, but the workbook is
+   still the file this editor is for. */
+#SecondButton {
+    font-size: 13px; color: #2d6cdf; background: #ffffff;
+    border: 1px solid #b9c8e4; border-radius: 6px; padding: 9px 22px;
+}
+#SecondButton:hover { background: #eef3fc; border-color: #2d6cdf; }
 #RecentLink {
     text-align: left; border: 1px solid #dfe3e8; border-radius: 5px;
     padding: 8px 12px; background: #fbfbfd; color: #1c2b45;
@@ -66,9 +74,24 @@ QMenuBar::item:selected { background: #2d6cdf; color: white; }
 
 MAX_RECENT = 8
 
+
+def _read_only_tag(path: str) -> str:
+    """What to append to a recent entry that cannot be edited.
+
+    A .dat in the recent list looks exactly like a workbook until it opens and
+    half the toolbar is grey, so the list says which ones those are.
+    """
+    return '  (read-only)' if path.lower().endswith(core.DAT_SUFFIX) else ''
+
 HELP_TEXT = """\
 OPENING A FILE
   File > Open file...  (Ctrl+O)  or drag a .xlsx file onto the window.
+
+  File > Open old .dat file...  reads Battle Realms.dat, the format the
+  spreadsheet replaced. It opens READ-ONLY: browse it, search it, open record
+  details, compare units and compare it against a workbook, but nothing can be
+  changed and nothing can be saved. The title bar says [read-only] while one is
+  open.
 
 EDITING
   Double-click a cell to edit it.
@@ -192,8 +215,15 @@ class MainWindow(QMainWindow):
                 a.setStatusTip(tip)
             return a
 
-        self.a_open = mkact('&Open file...', self.on_open, 'Ctrl+O',
-                            'Choose a Battle Realms.xlsx file')
+        # Two entries rather than one dialog with two filters, and both say
+        # which format they are for. "Open file..." next to an editor that now
+        # reads two formats is the one label that cannot be right.
+        self.a_open = mkact('&Open workbook...', self.on_open, 'Ctrl+O',
+                            'Open a Battle Realms.xlsx file for editing')
+        self.a_open_dat = mkact(
+            'Open old .&dat file (read-only)...', self.on_open_dat, None,
+            'Browse the game\'s old Battle Realms.dat. It cannot be edited '
+            'or saved')
         self.a_save = mkact('&Save', self.on_save, 'Ctrl+S')
         self.a_saveas = mkact('Save &As...', self.on_save_as, 'Ctrl+Shift+S')
         self.a_close = mkact('&Close file', self.on_close_file)
@@ -240,7 +270,11 @@ class MainWindow(QMainWindow):
         # ============================ menu bar
         mb = self.menuBar()
         m_file = mb.addMenu('&File')
+        # The two openers are one group, the recent list is its own: without
+        # the rule between them the .dat entry reads as a footnote to "Open".
         m_file.addAction(self.a_open)
+        m_file.addAction(self.a_open_dat)
+        m_file.addSeparator()
         self.m_recent = m_file.addMenu('Open &recent')
         m_file.addSeparator()
         m_file.addAction(self.a_save)
@@ -407,8 +441,9 @@ class MainWindow(QMainWindow):
         t.setAlignment(Qt.AlignmentFlag.AlignCenter)
         v.addWidget(t)
 
-        s = QLabel('Game data editor for the .xlsx version of Battle Realms.\n'
-                   'Every column that references a code table gets a dropdown.')
+        s = QLabel('Game data editor for Battle Realms.xlsx, the spreadsheet '
+                   'that replaced\nthe game\'s old .dat files. Every column '
+                   'that references a code table gets a dropdown.')
         s.setObjectName('WelcomeSub')
         s.setAlignment(Qt.AlignmentFlag.AlignCenter)
         v.addWidget(s)
@@ -425,10 +460,32 @@ class MainWindow(QMainWindow):
         v.addLayout(row)
         v.addSpacing(8)
 
-        hint = QLabel('or drag a .xlsx file onto this window  \u00b7  Ctrl+O')
+        hint = QLabel('or drag a file onto this window  \u00b7  Ctrl+O')
         hint.setObjectName('WelcomeSub')
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         v.addWidget(hint)
+        v.addSpacing(22)
+
+        # The second format, said on the screen the user actually lands on. It
+        # was only a File menu entry at first, which meant nobody who did not
+        # already know the editor reads .dat would ever find out that it does.
+        self.btn_open_dat = QPushButton('Open the old Battle Realms.dat...')
+        self.btn_open_dat.setObjectName('SecondButton')
+        self.btn_open_dat.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_open_dat.setSizePolicy(QSizePolicy.Policy.Fixed,
+                                        QSizePolicy.Policy.Fixed)
+        self.btn_open_dat.clicked.connect(self.on_open_dat)
+        row2 = QVBoxLayout()
+        row2.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        row2.addWidget(self.btn_open_dat, 0, Qt.AlignmentFlag.AlignCenter)
+        v.addLayout(row2)
+        v.addSpacing(6)
+
+        hint2 = QLabel('Read-only: browse the format the spreadsheet replaced. '
+                       'It cannot be edited or saved.')
+        hint2.setObjectName('WelcomeSub')
+        hint2.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        v.addWidget(hint2)
         v.addSpacing(26)
 
         self.lbl_recent_title = QLabel('Recent files')
@@ -466,7 +523,8 @@ class MainWindow(QMainWindow):
             a.setEnabled(False)
         else:
             for i, p in enumerate(lst):
-                a = self.m_recent.addAction(f'&{i + 1}.  {os.path.basename(p)}')
+                a = self.m_recent.addAction(
+                    f'&{i + 1}.  {os.path.basename(p)}{_read_only_tag(p)}')
                 a.setToolTip(p)
                 a.setStatusTip(p)
                 a.triggered.connect(lambda _c=False, path=p: self._open_recent(path))
@@ -479,7 +537,8 @@ class MainWindow(QMainWindow):
             if it.widget():
                 it.widget().deleteLater()
         for p in lst[:5]:
-            b = QPushButton(f'{os.path.basename(p)}      {os.path.dirname(p)}')
+            b = QPushButton(f'{os.path.basename(p)}{_read_only_tag(p)}'
+                            f'      {os.path.dirname(p)}')
             b.setObjectName('RecentLink')
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setMinimumWidth(560)
@@ -506,13 +565,20 @@ class MainWindow(QMainWindow):
         self.open_file(path)
 
     def _set_file_actions_enabled(self, on):
-        # a_undo / a_redo manage their own enabled state via QUndoStack
-        for a in (self.a_save, self.a_saveas, self.a_close, self.a_copy,
-                  self.a_paste, self.a_clear, self.a_revert, self.a_addrow,
-                  self.a_edits, self.a_find, self.a_gosheet, self.a_desc,
-                  self.a_detail, self.a_detail_row, self.a_compare,
-                  self.a_cmp_again, self.a_matchup, self.a_matchup_row):
+        # a_undo / a_redo manage their own enabled state via QUndoStack, and on
+        # a read-only book nothing is ever pushed onto it, so they stay off by
+        # themselves.
+        for a in (self.a_close, self.a_copy, self.a_find, self.a_gosheet,
+                  self.a_desc, self.a_detail, self.a_detail_row,
+                  self.a_compare, self.a_cmp_again, self.a_matchup,
+                  self.a_matchup_row):
             a.setEnabled(on)
+        # Everything that would change or write the file. A .dat is browsed,
+        # compared and searched like any other file; it is only never altered.
+        writable = on and not (self.book is not None and self.book.read_only)
+        for a in (self.a_save, self.a_saveas, self.a_paste, self.a_clear,
+                  self.a_revert, self.a_addrow, self.a_edits):
+            a.setEnabled(writable)
         # these two only make sense once a comparison has actually been run
         if not on:
             self.a_cmp_show.setEnabled(False)
@@ -522,16 +588,18 @@ class MainWindow(QMainWindow):
         self.ed_sheet.setEnabled(on)
 
     # -------------------------------------------------------- drag and drop
+    DROPPABLE = ('.xlsx', '.xlsm', '.dat')
+
     def dragEnterEvent(self, ev):
         md = ev.mimeData()
-        if md.hasUrls() and any(u.toLocalFile().lower().endswith(('.xlsx', '.xlsm'))
+        if md.hasUrls() and any(u.toLocalFile().lower().endswith(self.DROPPABLE)
                                 for u in md.urls()):
             ev.acceptProposedAction()
 
     def dropEvent(self, ev):
         for u in ev.mimeData().urls():
             p = u.toLocalFile()
-            if p.lower().endswith(('.xlsx', '.xlsm')):
+            if p.lower().endswith(self.DROPPABLE):
                 self.open_file(p)
                 ev.acceptProposedAction()
                 return
@@ -545,10 +613,21 @@ class MainWindow(QMainWindow):
         if p:
             self.open_file(p)
 
+    def on_open_dat(self):
+        last = self.settings.value('lastdir', os.path.expanduser('~'))
+        p, _ = QFileDialog.getOpenFileName(
+            self, 'Open the old Battle Realms.dat', last,
+            'Battle Realms data file (*.dat);;All files (*.*)')
+        if p:
+            self.open_file(p)
+
     def open_file(self, path):
         if self.book and self.book.dirty and not self._confirm_discard():
             return
-        dlg = QProgressDialog('Reading workbook...', None, 0, 100, self)
+        is_dat = path.lower().endswith(core.DAT_SUFFIX)
+        dlg = QProgressDialog(
+            'Reading the old data file...' if is_dat else 'Reading workbook...',
+            None, 0, 100, self)
         dlg.setWindowTitle(APP_NAME)
         dlg.setWindowModality(Qt.WindowModality.ApplicationModal)
         dlg.setMinimumDuration(0)
@@ -581,9 +660,11 @@ class MainWindow(QMainWindow):
         self._fill_sheet_list()
         self._update_title()
         n_drop = sum(len(s.col_enum) for s in self.book.sheets.values())
+        note = ' - read-only, this format cannot be saved yet' if is_dat else ''
         self.lbl_status.setText(
             f'{os.path.basename(path)} - {len(self.book.sheets)} sheets, '
-            f'{len(self.book.enums)} code tables, {n_drop} dropdown columns')
+            f'{len(self.book.enums)} code tables, {n_drop} dropdown columns'
+            f'{note}')
 
     def on_close_file(self):
         if not self.book:
@@ -1189,7 +1270,7 @@ class MainWindow(QMainWindow):
         one = self.book.colour_group(sheet, c)
         if one:
             groups = [one]
-        if groups:
+        if groups and not self.book.read_only:
             a_col = m.addAction(pick_label(groups))
             a_col.triggered.connect(lambda: self._pick_colour(sheet, r, groups))
             m.addSeparator()
@@ -1217,6 +1298,8 @@ class MainWindow(QMainWindow):
 
     def _pick_colour(self, sheet, row, groups):
         """Set one or more whole colours from the dialog, as one undo step."""
+        if self.book.read_only:
+            return
         changes = ask_colour(self, self.book, sheet, row, groups)
         if changes is None:
             return
@@ -1261,9 +1344,14 @@ class MainWindow(QMainWindow):
             self.setWindowTitle(APP_NAME)
             self.lbl_dirty.setText('')
             return
+        name = os.path.basename(self.book.path)
+        if self.book.read_only:
+            self.setWindowTitle(f'{APP_NAME} - {name} [read-only]')
+            self.lbl_dirty.setText('Read-only')
+            return
         n = len(self.book.edits)
         star = ' •' if n else ''
-        self.setWindowTitle(f'{APP_NAME} - {os.path.basename(self.book.path)}{star}')
+        self.setWindowTitle(f'{APP_NAME} - {name}{star}')
         self.lbl_dirty.setText(f'{n} cells edited' if n else 'Saved')
 
 

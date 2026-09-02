@@ -16,9 +16,12 @@ from datetime import datetime
 
 import openpyxl
 
-from . import schema
+from . import dat, schema
 
 NS_MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+
+# The game's old binary format. Opened read-only: see BRWorkbook.read_only.
+DAT_SUFFIX = '.dat'
 
 
 # ------------------------------------------------------------------ utils
@@ -90,6 +93,11 @@ class BRWorkbook:
 
     def __init__(self, path: str, progress=None):
         self.path = path
+        # A .dat is the format the workbook replaced, and it is only ever read.
+        # Everything above this class works off `read_only` rather than off the
+        # file name: the two grids drop ItemIsEditable, the editing actions grey
+        # out, and `save()` refuses outright.
+        self.read_only = path.lower().endswith(DAT_SUFFIX)
         self.enums: dict[str, EnumTable] = {}
         self.sheets: dict[str, SheetData] = {}
         self.sheet_order: list[str] = []
@@ -103,6 +111,35 @@ class BRWorkbook:
 
     # ------------------------------------------------------------ loading
     def _load(self, progress=None):
+        raw = (self._read_dat if self.read_only else self._read_xlsx)(progress)
+        self._build(raw)
+
+    def _read_dat(self, progress=None) -> dict:
+        """A .dat in the same {sheet: [header row, ...]} shape as a workbook.
+
+        The two formats hold the same data model, so the whole of `_build` -
+        enum mapping, colour groups, the lot - applies to both and there is no
+        second code path to keep in step.
+
+        Two things worth knowing. The .dat names its tables in full, and four of
+        those names are too long for an Excel sheet and are truncated in the
+        .xlsx; the full name is what is shown here, because this really is the
+        old file and renaming its tables to match a workbook that is not open
+        would be a lie. And the enum sheets get two columns rather than the
+        workbook's three: the .dat has no SymbolGroup, and inventing a blank one
+        would put an empty column on screen that no file ever had.
+        """
+        d = dat.DatFile(self.path, progress=progress)
+        raw = {}
+        for name in d.table_order:
+            raw[name] = d.tables[name].as_sheet()
+        for key in d.enum_order:
+            raw['Enum_' + key] = ([['Code', 'Description']]
+                                  + [[c, desc]
+                                     for c, desc in d.enums[key].items])
+        return raw
+
+    def _read_xlsx(self, progress=None) -> dict:
         wb = openpyxl.load_workbook(self.path, read_only=True, data_only=True)
         names = wb.sheetnames
         total = len(names)
@@ -117,7 +154,9 @@ class BRWorkbook:
                 rows.pop()
             raw[name] = rows
         wb.close()
+        return raw
 
+    def _build(self, raw: dict):
         # 1. enum tables
         for name, rows in raw.items():
             if not name.startswith('Enum_'):
@@ -282,6 +321,16 @@ class BRWorkbook:
         return out
 
     def save(self, dest: str | None = None, backup: bool = True) -> str:
+        # Saving works by patching the cells that changed inside the source
+        # archive, which a .dat is not. Writing one back is a separate problem -
+        # a string field is stored inline and length-prefixed, so changing one
+        # shifts every byte after it and invalidates both offset tables - and
+        # until that is solved the refusal belongs here rather than in the UI,
+        # where a path nobody thought of could still reach it.
+        if self.read_only:
+            raise RuntimeError(
+                'This file was opened read-only. The .dat format can be read '
+                'but not written yet.')
         dest = dest or self.path
         src = self.path
         if backup and os.path.exists(dest):

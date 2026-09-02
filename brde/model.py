@@ -145,8 +145,13 @@ class SheetModel(QAbstractTableModel):
     def flags(self, index):
         if not index.isValid():
             return Qt.ItemFlag.NoItemFlags
-        return (Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
-                | Qt.ItemFlag.ItemIsEditable)
+        base = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+        # A read-only book is still fully browsable and still copies out; it
+        # just never opens an editor. Taking the flag away here is what stops
+        # the grid, rather than each of the ways into it being guarded.
+        if self.book.read_only:
+            return base
+        return base | Qt.ItemFlag.ItemIsEditable
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
         if role != Qt.ItemDataRole.EditRole or not index.isValid():
