@@ -102,23 +102,23 @@ EDITING
   Cells in red hold a code that does not exist in the enum table.
 
 KEYBOARD SHORTCUTS
-  Ctrl+O           open file
-  Ctrl+S           save
-  Ctrl+Z           undo
-  Ctrl+Y           redo
-  Ctrl+C           copy
-  Ctrl+V           paste (Excel-style, tab separated)
-  Ctrl+R           revert to original
-  Del              clear cell
-  Ctrl+F           filter rows
-  Ctrl+P           go to sheet
-  Ctrl+E           list edited cells
-  Ctrl+Shift+N     add row
-  Ctrl+I           find a record
-  Ctrl+Shift+I     details for the selected row
-  Ctrl+U           compare two units
-  Ctrl+Shift+U     compare the selected unit
-  F1               show this help
+  Ctrl+O              open file
+  Ctrl+S              save
+  Ctrl+Z              undo
+  Ctrl+Y              redo
+  Ctrl+C              copy
+  Ctrl+V              paste (Excel-style, tab separated)
+  Ctrl+R              revert to original
+  Del                 clear cell
+  Ctrl+F              filter rows
+  Ctrl+P              go to sheet
+  Ctrl+E              list edited cells
+  Ctrl+Shift+N        add row
+  Ctrl+I              find a record
+  Ctrl+Shift+I        details for the selected row
+  Ctrl+U              compare two units
+  Ctrl+Shift+U        compare the selected unit
+  F1                  show this help
 
 RECORD DETAILS  (Record > Find record..., Ctrl+I)
   Type a unit or building name - "samurai", "dojo" - and pick it from the list.
