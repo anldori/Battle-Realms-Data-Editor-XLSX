@@ -18,10 +18,9 @@ from PyQt6.QtGui import QAction, QFont, QIcon, QKeySequence, QUndoStack
 from PyQt6.QtWidgets import (QApplication, QCheckBox, QDialog, QFileDialog,
                              QHBoxLayout, QHeaderView, QInputDialog, QLabel,
                              QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
-                             QMenu, QMessageBox, QProgressDialog, QPushButton,
-                             QSizePolicy, QSplitter, QStackedWidget, QStatusBar,
-                             QTableView, QTextBrowser, QToolBar, QVBoxLayout,
-                             QWidget)
+                             QMenu, QMessageBox, QPlainTextEdit, QProgressDialog,
+                             QPushButton, QSizePolicy, QSplitter, QStackedWidget,
+                             QStatusBar, QTableView, QToolBar, QVBoxLayout, QWidget)
 
 from . import about, compare, core, detail, matchup, matchup_ui
 from .model import (EnumDelegate, MultiSetCommand, RowFilter, SetValueCommand,
@@ -187,10 +186,13 @@ class HelpDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
-        text_browser = QTextBrowser()
-        text_browser.setPlainText(HELP_TEXT)
-        text_browser.setReadOnly(True)
-        layout.addWidget(text_browser)
+        text_edit = QPlainTextEdit()
+        text_edit.setPlainText(HELP_TEXT)
+        text_edit.setReadOnly(True)
+        f = QFont()
+        f.setFixedPitch(True)
+        text_edit.setFont(f)
+        layout.addWidget(text_edit)
 
         button_layout = QHBoxLayout()
         button_layout.addStretch()
