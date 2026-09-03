@@ -40,6 +40,10 @@ CHANGELOG = [
         '<b>Auto-save, if you want it.</b> Off by default. Turn it on and '
         'every edit is written to the file as you make it, and '
         '<code>Ctrl+Z</code> still undoes as normal.',
+        '<b>The help page can be read.</b> <code>F1</code> opened a message '
+        'box that could not be scrolled or resized, so the end of it was out '
+        'of reach. It is a window of its own now, and the keyboard shortcuts '
+        'line up because it is set in a monospaced font.',
     ]),
     ('1.5.0', '', [
         "<b>Open the game's old <code>.dat</code> file.</b> "

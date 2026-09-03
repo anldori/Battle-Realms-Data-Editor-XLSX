@@ -15,6 +15,9 @@ Also shown in **Help ▸ About**, which is the authoritative copy - it is genera
   last few so the folder stays tidy.
 - **Auto-save, if you want it.** Off by default. Turn it on and every edit is written
   to the file as you make it, and `Ctrl+Z` still undoes as normal.
+- **The help page can be read.** `F1` opened a message box that could not be scrolled
+  or resized, so the end of it was out of reach. It is a window of its own now, and
+  the keyboard shortcuts line up because it is set in a monospaced font.
 
 ## 1.5.0
 
