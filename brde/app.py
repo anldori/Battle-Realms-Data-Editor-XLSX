@@ -189,9 +189,7 @@ class HelpDialog(QDialog):
         text_edit = QPlainTextEdit()
         text_edit.setPlainText(HELP_TEXT)
         text_edit.setReadOnly(True)
-        f = QFont()
-        f.setFixedPitch(True)
-        text_edit.setFont(f)
+        text_edit.setFont(QFont('Courier New', 10))
         layout.addWidget(text_edit)
 
         button_layout = QHBoxLayout()
