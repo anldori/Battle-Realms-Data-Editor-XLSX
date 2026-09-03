@@ -181,9 +181,7 @@ class HelpDialog(QDialog):
         text_browser = QTextBrowser()
         text_browser.setPlainText(HELP_TEXT)
         text_browser.setReadOnly(True)
-        f = QFont('Courier')
-        f.setPointSize(10)
-        text_browser.setFont(f)
+        text_browser.setFont(QFont('Consolas', 10))
         layout.addWidget(text_browser)
 
         button_layout = QHBoxLayout()
