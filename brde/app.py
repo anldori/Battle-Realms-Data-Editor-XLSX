@@ -888,12 +888,17 @@ class MainWindow(QMainWindow):
 
     def _apply_theme(self):
         theme = self.settings.value('theme', settings.SYSTEM_THEME)
+        app = QApplication.instance()
         if theme == settings.DARK_THEME:
             self.setStyleSheet(settings.DARK_STYLE)
-            QApplication.instance().setPalette(settings.get_dark_palette())
+            app.setPalette(settings.get_dark_palette())
         else:
             self.setStyleSheet(LIGHT_STYLE)
-            QApplication.instance().setPalette(settings.get_light_palette())
+            app.setPalette(settings.get_light_palette())
+
+        app.style().polish(app)
+        for widget in app.allWidgets():
+            widget.style().polish(widget)
 
     def on_set_theme(self, theme):
         self.settings.setValue('theme', theme)
