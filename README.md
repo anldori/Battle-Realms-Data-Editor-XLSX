@@ -15,15 +15,11 @@ changed format can still be read.
 
 ## Getting started
 
-### The easy way - download a ready-made build
+### Running from source (recommended)
 
-Grab the latest build from the
-[Releases page](https://github.com/anldori/Battle-Realms-Data-Editor-XLSX/releases), nothing to install. If Windows Defender flags the download, see
-[If your antivirus flags the .exe](#if-your-antivirus-flags-the-exe).
+For the latest features and improvements, run directly from source code. Two ways:
 
-### Running from source
-
-Two ways, both from a copy of this repository.
+**From a copy of this repository:**
 
 **1. Double-click `quick_start.bat`** (Windows). It sets everything up for you:
 
@@ -43,6 +39,13 @@ pip install -r requirements.txt
 python br_editor.py                                  # welcome screen
 python br_editor.py "C:\path\to\Battle Realms.xlsx"  # open a file directly
 ```
+
+### Pre-built .exe (older versions)
+
+For stable releases from the [Releases page](https://github.com/anldori/Battle-Realms-Data-Editor-XLSX/releases), grab a ready-made build - nothing to install. 
+If Windows Defender flags the download, see [If your antivirus flags the .exe](#if-your-antivirus-flags-the-exe).
+
+> **Note:** Latest features (dark theme, improved help dialog) are only in the source code. For the newest features, use the source code method above.
 
 <img width="1442" height="892" alt="image" src="https://github.com/user-attachments/assets/8a26321b-3d30-46d1-814c-6d9a4b641734" />
 
