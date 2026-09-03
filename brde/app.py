@@ -15,12 +15,13 @@ import traceback
 
 from PyQt6.QtCore import QSettings, Qt, QTimer
 from PyQt6.QtGui import QAction, QFont, QIcon, QKeySequence, QUndoStack
-from PyQt6.QtWidgets import (QApplication, QCheckBox, QFileDialog, QHeaderView,
-                             QInputDialog, QLabel, QLineEdit, QListWidget,
-                             QListWidgetItem, QMainWindow, QMenu, QMessageBox,
-                             QProgressDialog, QPushButton, QSizePolicy,
-                             QSplitter, QStackedWidget, QStatusBar, QTableView,
-                             QToolBar, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (QApplication, QCheckBox, QDialog, QFileDialog,
+                             QHBoxLayout, QHeaderView, QInputDialog, QLabel,
+                             QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
+                             QMenu, QMessageBox, QProgressDialog, QPushButton,
+                             QSizePolicy, QSplitter, QStackedWidget, QStatusBar,
+                             QTableView, QTextBrowser, QToolBar, QVBoxLayout,
+                             QWidget)
 
 from . import about, compare, core, detail, matchup, matchup_ui
 from .model import (EnumDelegate, MultiSetCommand, RowFilter, SetValueCommand,
@@ -166,6 +167,32 @@ SAVING
   Only the edited cells are patched inside the XML; the rest of the file stays
   byte-for-byte identical, so the game reads it exactly as before.
 """
+
+
+class HelpDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('How to use')
+        self.resize(700, 600)
+        self.setSizeGripEnabled(True)
+
+        layout = QVBoxLayout(self)
+
+        text_browser = QTextBrowser()
+        text_browser.setPlainText(HELP_TEXT)
+        text_browser.setReadOnly(True)
+        f = QFont('Courier')
+        f.setPointSize(10)
+        text_browser.setFont(f)
+        layout.addWidget(text_browser)
+
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        close_btn = QPushButton('Close')
+        close_btn.setDefault(True)
+        close_btn.clicked.connect(self.accept)
+        button_layout.addWidget(close_btn)
+        layout.addLayout(button_layout)
 
 
 class MainWindow(QMainWindow):
@@ -848,7 +875,7 @@ class MainWindow(QMainWindow):
             self.show_sheet(name)
 
     def on_help(self):
-        QMessageBox.information(self, 'How to use', HELP_TEXT)
+        HelpDialog(self).exec()
 
     def on_about(self):
         about.AboutDialog(self).exec()
