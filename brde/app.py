@@ -22,14 +22,14 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QDialog, QFileDialog,
                              QPushButton, QSizePolicy, QSplitter, QStackedWidget,
                              QStatusBar, QTableView, QToolBar, QVBoxLayout, QWidget)
 
-from . import about, compare, core, detail, matchup, matchup_ui
+from . import about, compare, core, detail, matchup, matchup_ui, settings
 from .model import (EnumDelegate, MultiSetCommand, RowFilter, SetValueCommand,
                     SheetModel, ask_colour, coerce, pick_label)
 
 APP_NAME = 'Battle Realms Data Editor'
 ORG = 'BRDE'
 
-STYLE = """
+LIGHT_STYLE = """
 QMainWindow, QWidget { font-size: 12px; }
 QListWidget { border: none; background: #fbfbfd; }
 QListWidget::item { padding: 5px 8px; }
@@ -57,9 +57,6 @@ QMenuBar::item:selected { background: #2d6cdf; color: white; }
     border: none; border-radius: 6px; padding: 12px 30px;
 }
 #BigButton:hover { background: #2559b8; }
-/* The second way in, for the old .dat. Outlined rather than filled: it is a
-   real offer and has to be visible on the welcome screen, but the workbook is
-   still the file this editor is for. */
 #SecondButton {
     font-size: 13px; color: #2d6cdf; background: #ffffff;
     border: 1px solid #b9c8e4; border-radius: 6px; padding: 9px 22px;
@@ -297,6 +294,9 @@ class MainWindow(QMainWindow):
         self.a_desc.setCheckable(True)
         self.a_desc.setChecked(True)
         self.a_desc.toggled.connect(self.on_toggle_desc)
+        self.a_theme_light = mkact('&Light', lambda: self.on_set_theme(settings.LIGHT_THEME))
+        self.a_theme_dark = mkact('&Dark', lambda: self.on_set_theme(settings.DARK_THEME))
+        self.a_theme_system = mkact('&System default', lambda: self.on_set_theme(settings.SYSTEM_THEME))
         self.a_help = mkact('&How to use', self.on_help, 'F1')
         self.a_about = mkact('&About', self.on_about)
 
@@ -347,6 +347,12 @@ class MainWindow(QMainWindow):
         m_cmp.addSeparator()
         m_cmp.addAction(self.a_matchup)
         m_cmp.addAction(self.a_matchup_row)
+
+        m_settings = mb.addMenu('&Settings')
+        m_theme = m_settings.addMenu('&Theme')
+        m_theme.addAction(self.a_theme_light)
+        m_theme.addAction(self.a_theme_dark)
+        m_theme.addAction(self.a_theme_system)
 
         m_help = mb.addMenu('&Help')
         m_help.addAction(self.a_help)
@@ -446,7 +452,7 @@ class MainWindow(QMainWindow):
         self.lbl_dirty = QLabel('')
         self.status.addPermanentWidget(self.lbl_dirty)
 
-        self.setStyleSheet(STYLE)
+        self._apply_theme()
 
         # copy / paste / clear shortcuts scoped to the table
         for seq, fn in (('Ctrl+C', self.on_copy), ('Ctrl+V', self.on_paste),
@@ -879,6 +885,19 @@ class MainWindow(QMainWindow):
                                         names, cur, True)
         if ok and name in self.book.sheets:
             self.show_sheet(name)
+
+    def _apply_theme(self):
+        theme = self.settings.value('theme', settings.SYSTEM_THEME)
+        if theme == settings.DARK_THEME:
+            self.setStyleSheet(settings.DARK_STYLE)
+            QApplication.instance().setPalette(settings.get_dark_palette())
+        else:
+            self.setStyleSheet(LIGHT_STYLE)
+            QApplication.instance().setPalette(settings.get_light_palette())
+
+    def on_set_theme(self, theme):
+        self.settings.setValue('theme', theme)
+        self._apply_theme()
 
     def on_help(self):
         HelpDialog(self).exec()
