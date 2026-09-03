@@ -3,7 +3,20 @@
 Also shown in **Help ▸ About**, which is the authoritative copy - it is generated from
 `CHANGELOG` in `brde/about.py`.
 
-## 1.5.0 (current)
+## 1.6.0 (current)
+
+- **A dark theme.** *Settings ▸ Themes* switches between light, dark, and whatever
+  the system is set to, and remembers which you picked.
+- **The font is yours to choose.** *Settings ▸ Display* sets the typeface, its size,
+  and how tall a grid row is, with a **Reset to default** that puts back what the
+  editor started with.
+- **Backups can be turned off, or kept short.** *Settings ▸ Saving* stops the
+  timestamped `.bak` appearing beside your workbook on every save, or caps it at the
+  last few so the folder stays tidy.
+- **Auto-save, if you want it.** Off by default. Turn it on and every edit is written
+  to the file as you make it, and `Ctrl+Z` still undoes as normal.
+
+## 1.5.0
 
 - **Open the game's old `.dat` file.** *File ▸ Open old .dat file…* reads
   `Battle Realms.dat`, the format the spreadsheet replaced, so an old mod can still be

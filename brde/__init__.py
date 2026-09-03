@@ -9,6 +9,8 @@ Module layout, in dependency order - nothing here imports anything above it:
     schema     which columns reference which Enum_* table (pure logic, no Qt)
     matchup    unit versus unit: armour, damage classes, counters (no Qt either)
     dat        reads the game's old Battle Realms.dat (read-only, no Qt)
+    colour_dialog  picks one colour; pure Qt, knows nothing of a workbook
+    settings   theme styles, and the Saving and Display preference dialogs
     core       reads the workbook, saves by patching the XML inside the .xlsx zip
     model      grid table model, dropdown delegate, undo commands
     detail     record search and the per-record stat page
@@ -17,5 +19,5 @@ Module layout, in dependency order - nothing here imports anything above it:
     app        the main window, wiring all of the above together
 """
 
-__version__ = '1.5.0'
+__version__ = '1.6.0'
 __all__ = ['__version__']

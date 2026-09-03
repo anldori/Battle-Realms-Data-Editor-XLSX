@@ -47,6 +47,26 @@ def xml_escape(s: str) -> str:
             .replace('>', '&gt;'))
 
 
+def _cleanup_old_backups(dest: str, keep_count: int):
+    """Remove old .bak files, keeping the most recent keep_count backups."""
+    if keep_count <= 0:
+        return
+    dir_path = os.path.dirname(dest) or '.'
+    base_name = os.path.basename(dest)
+    backups = []
+    for name in os.listdir(dir_path):
+        if name.startswith(base_name) and name.endswith('.bak'):
+            full_path = os.path.join(dir_path, name)
+            mtime = os.path.getmtime(full_path)
+            backups.append((mtime, full_path))
+    backups.sort(reverse=True)
+    for _, path in backups[keep_count:]:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
 # ------------------------------------------------------------------ model
 class EnumTable:
     """One Enum_* sheet: numeric code <-> description."""
@@ -320,7 +340,7 @@ class BRWorkbook:
             out[_unescape(name)] = path
         return out
 
-    def save(self, dest: str | None = None, backup: bool = True) -> str:
+    def save(self, dest: str | None = None, backup: bool = True, keep_count: int = 5) -> str:
         # Saving works by patching the cells that changed inside the source
         # archive, which a .dat is not. Writing one back is a separate problem -
         # a string field is stored inline and length-prefixed, so changing one
@@ -337,6 +357,7 @@ class BRWorkbook:
             stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             bak = f'{dest}.{stamp}.bak'
             shutil.copy2(dest, bak)
+            _cleanup_old_backups(dest, keep_count)
 
         by_sheet: dict[str, dict[tuple[int, int], object]] = {}
         for (sh, r, c), v in self.edits.items():

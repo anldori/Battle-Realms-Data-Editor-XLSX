@@ -63,7 +63,8 @@ The last 8 files you opened are remembered and appear under **File ▸ Open rece
 on the welcome screen.
 
 > Keep a backup copy of the original `Battle Realms.xlsx` before you start modding.
-> The editor also writes a `.bak` next to the file every time you save.
+> The editor also writes a `.bak` next to the file every time you save. You can enable/disable
+> backups and control how many to keep in **Settings ▸ Saving**.
 
 ### Opening the old `.dat` file
 
@@ -218,7 +219,10 @@ held that your workbook does not. **Take other value** is disabled there, since 
 | **Add row** | `Ctrl+Shift+N` appends a row to the current sheet. |
 | **Quick sheet switching** | `Ctrl+P` to type a sheet name, or use the searchable list on the left. |
 | **Open recent** | The last 8 files are remembered between sessions. |
-| **Automatic backup** | Every save first creates `Battle Realms.xlsx.YYYYMMDD_HHMMSS.bak`. |
+| **Auto-save on change** | Off by default. Turn it on in **Settings ▸ Saving** and every edit is written to the file as you make it - `Ctrl+Z` still undoes as normal. |
+| **Automatic backup** | Every save first creates `Battle Realms.xlsx.YYYYMMDD_HHMMSS.bak`. **Settings ▸ Saving** turns this off, or caps it at the last few so the folder stays tidy. |
+| **Dark / light theme** | **Settings ▸ Themes** - dark, light, or follow the system. |
+| **Font and row height** | **Settings ▸ Display** sets the font, its size, and how tall a grid row is, with a **Reset to default** that puts back what the editor started with. |
 
 ---
 
@@ -231,6 +235,7 @@ held that your workbook does not. **Take other value** is disabled there, since 
 | **View** | Show enum descriptions · Filter rows · Go to sheet… · List edited cells |
 | **Record** | Find record… (`Ctrl+I`) · Details for the selected row (`Ctrl+Shift+I`) |
 | **Compare** | Compare with another file… (`Ctrl+D`) · Compare with last file again · Show last report · Clear comparison · Compare units… (`Ctrl+U`) · Compare this unit with… (`Ctrl+Shift+U`) |
+| **Settings** | Themes ▸ (Light · Dark · System default) · Display… · Saving… |
 | **Help** | How to use (`F1`) · About |
 
 ---

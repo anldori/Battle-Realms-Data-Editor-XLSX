@@ -215,6 +215,11 @@ class MainWindow(QMainWindow):
         self.settings = settings if settings is not None \
             else QSettings(ORG, APP_NAME)
 
+        # Captured before any stylesheet runs: this is what "Reset to default"
+        # in the display dialog goes back to, and the baseline the saved font
+        # size is compared against.
+        self._base_font = self.font()
+
         self.book: core.BRWorkbook | None = None
         self.model: SheetModel | None = None
         self.proxy = RowFilter(self)
@@ -225,8 +230,10 @@ class MainWindow(QMainWindow):
         self._compare_result = None
         self._detail_dlg = None
         self._matchup_dlg = None
+        self._autosave_pending = False
 
         self._build_ui()
+        self.undo.indexChanged.connect(self._on_undo_changed)
         self.setAcceptDrops(True)
         if path and os.path.exists(path):
             QTimer.singleShot(80, lambda: self.open_file(path))
@@ -297,6 +304,8 @@ class MainWindow(QMainWindow):
         self.a_theme_light = mkact('&Light', lambda: self.on_set_theme(settings.LIGHT_THEME))
         self.a_theme_dark = mkact('&Dark', lambda: self.on_set_theme(settings.DARK_THEME))
         self.a_theme_system = mkact('&System default', lambda: self.on_set_theme(settings.SYSTEM_THEME))
+        self.a_saving = mkact('&Saving...', self.on_saving)
+        self.a_display = mkact('&Display...', self.on_display)
         self.a_help = mkact('&How to use', self.on_help, 'F1')
         self.a_about = mkact('&About', self.on_about)
 
@@ -349,10 +358,12 @@ class MainWindow(QMainWindow):
         m_cmp.addAction(self.a_matchup_row)
 
         m_settings = mb.addMenu('&Settings')
-        m_theme = m_settings.addMenu('&Theme')
+        m_theme = m_settings.addMenu('&Themes')
         m_theme.addAction(self.a_theme_light)
         m_theme.addAction(self.a_theme_dark)
         m_theme.addAction(self.a_theme_system)
+        m_settings.addAction(self.a_display)
+        m_settings.addAction(self.a_saving)
 
         m_help = mb.addMenu('&Help')
         m_help.addAction(self.a_help)
@@ -429,7 +440,8 @@ class MainWindow(QMainWindow):
             QHeaderView.ResizeMode.Interactive)
         # measure widths from ~40 rows only, so big sheets open fast
         self.tbl.horizontalHeader().setResizeContentsPrecision(40)
-        self.tbl.verticalHeader().setDefaultSectionSize(22)
+        self.tbl.verticalHeader().setDefaultSectionSize(
+            settings.DEFAULT_ROW_HEIGHT)
         rv.addWidget(self.tbl)
 
         self.sp = QSplitter()
@@ -452,7 +464,7 @@ class MainWindow(QMainWindow):
         self.lbl_dirty = QLabel('')
         self.status.addPermanentWidget(self.lbl_dirty)
 
-        self._apply_theme()
+        self._apply_display()
 
         # copy / paste / clear shortcuts scoped to the table
         for seq, fn in (('Ctrl+C', self.on_copy), ('Ctrl+V', self.on_paste),
@@ -745,7 +757,9 @@ class MainWindow(QMainWindow):
     def _do_save(self, dest):
         try:
             n = len(self.book.edits)
-            out = self.book.save(dest, backup=True)
+            backup_enabled = self.settings.value('backup/enabled', True, type=bool)
+            backup_count = self.settings.value('backup/keep_count', 5, type=int)
+            out = self.book.save(dest, backup=backup_enabled, keep_count=backup_count)
         except Exception as e:
             QMessageBox.critical(self, APP_NAME,
                                  f'Save failed:\n{e}\n\n{traceback.format_exc()}')
@@ -758,7 +772,8 @@ class MainWindow(QMainWindow):
         if self._matchup_dlg is not None:
             self._matchup_dlg.refresh()
         self._update_title()
-        self.lbl_status.setText(f'Saved {n} cells to {out}  (.bak backup created)')
+        backup_msg = '  (.bak backup created)' if backup_enabled else ''
+        self.lbl_status.setText(f'Saved {n} cells to {out}{backup_msg}')
 
     def _confirm_discard(self):
         r = QMessageBox.question(
@@ -886,14 +901,42 @@ class MainWindow(QMainWindow):
         if ok and name in self.book.sheets:
             self.show_sheet(name)
 
+    def _on_undo_changed(self):
+        autosave_enabled = self.settings.value('autosave/enabled', False, type=bool)
+        if autosave_enabled and self.book and self.book.dirty and not self.book.read_only:
+            self._autosave_pending = True
+            QTimer.singleShot(100, self._autosave)
+
+    def _autosave(self):
+        if self._autosave_pending and self.book and self.book.dirty:
+            self._autosave_pending = False
+            try:
+                n = len(self.book.edits)
+                backup_enabled = self.settings.value('backup/enabled', True, type=bool)
+                backup_count = self.settings.value('backup/keep_count', 5, type=int)
+                out = self.book.save(self.book.path, backup=backup_enabled, keep_count=backup_count)
+                backup_msg = '  (.bak backup created)' if backup_enabled else ''
+                self.lbl_status.setText(f'Auto-saved {n} cells to {out}{backup_msg}')
+                for m in self._models.values():
+                    m.refresh_all()
+                if self._detail_dlg is not None:
+                    self._detail_dlg.refresh()
+                if self._matchup_dlg is not None:
+                    self._matchup_dlg.refresh()
+            except Exception as e:
+                self.lbl_status.setText(f'Auto-save failed: {e}')
+
     def _apply_theme(self):
         theme = self.settings.value('theme', settings.SYSTEM_THEME)
         app = QApplication.instance()
+        # The font rules go after the theme, not instead of it: the theme pins
+        # a font-size the app font cannot override, so the two are one sheet.
+        font_css = settings.font_style(self.settings, self._base_font)
         if theme == settings.DARK_THEME:
-            self.setStyleSheet(settings.DARK_STYLE)
+            self.setStyleSheet(settings.DARK_STYLE + font_css)
             app.setPalette(settings.get_dark_palette())
         else:
-            self.setStyleSheet(LIGHT_STYLE)
+            self.setStyleSheet(LIGHT_STYLE + font_css)
             app.setPalette(settings.get_light_palette())
 
         app.style().polish(app)
@@ -903,6 +946,26 @@ class MainWindow(QMainWindow):
     def on_set_theme(self, theme):
         self.settings.setValue('theme', theme)
         self._apply_theme()
+
+    def on_saving(self):
+        dlg = settings.SavingSettingsDialog(self, self.settings)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            dlg.save_settings()
+
+    def on_display(self):
+        dlg = settings.DisplaySettingsDialog(self, self.settings,
+                                             self._base_font)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            dlg.save_settings()
+            self._apply_display()
+
+    def _apply_display(self):
+        # The font lives in the stylesheet, so re-applying the theme is what
+        # puts it on screen; row height is the table's own business.
+        self._apply_theme()
+        row_height = self.settings.value('display/row_height',
+                                         settings.DEFAULT_ROW_HEIGHT, type=int)
+        self.tbl.verticalHeader().setDefaultSectionSize(row_height)
 
     def on_help(self):
         HelpDialog(self).exec()

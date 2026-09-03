@@ -1,12 +1,58 @@
-"""Settings dialog for theme selection."""
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPalette
+"""Theme styles, and the Saving and Display preference dialogs.
+
+Neither dialog owns a QSettings: the window that opens one passes its own in,
+so preferences are read back from where they were written. The test suite
+points MainWindow at an ini file in a temp directory, and a dialog that built
+its own QSettings would quietly write to the user's real one instead.
+"""
+from PyQt6.QtGui import QColor, QPalette, QFont, QFontDatabase
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                             QRadioButton, QButtonGroup, QPushButton)
+                             QPushButton, QCheckBox, QSpinBox, QGroupBox,
+                             QFontComboBox)
 
 LIGHT_THEME = 'light'
 DARK_THEME = 'dark'
 SYSTEM_THEME = 'system'
+
+# Matches the QTableView default set in app.py, so "Reset to default" and a
+# fresh install agree on what an untouched grid looks like.
+DEFAULT_ROW_HEIGHT = 22
+
+# Both themes pin `font-size: 12px` on QWidget, and a stylesheet beats
+# QApplication.setFont() every time - setting the app font alone changes
+# nothing on screen. So the chosen font is compiled into a stylesheet of its
+# own and appended after the theme, where a later rule of equal weight wins.
+# The `#Welcome*` and `#*Button` rules are ID selectors and outrank this, so
+# the welcome screen keeps its own sizes and only picks up the family.
+_FONT_STYLE = """
+QWidget, QMainWindow, QDialog, QMenuBar, QMenu, QToolBar, QLabel, QPushButton,
+QCheckBox, QRadioButton, QComboBox, QSpinBox, QLineEdit, QPlainTextEdit,
+QListWidget, QTableView, QHeaderView::section, QGroupBox, QTabBar::tab {
+    font-family: "%s";
+    font-size: %dpt;
+}
+"""
+
+
+def default_font(base_font=None):
+    """The font Qt hands out before any preference is applied.
+
+    Callers that have a window pass the font it started with; the fallback is
+    for anything with no window to ask, the test suite mainly.
+    """
+    if base_font is not None:
+        return base_font
+    return QFontDatabase.systemFont(QFontDatabase.SystemFont.GeneralFont)
+
+
+def font_style(settings, base_font=None):
+    """Stylesheet fragment for the saved font, or '' if none was ever saved."""
+    if not settings.contains('display/font'):
+        return ''
+    base = default_font(base_font)
+    family = settings.value('display/font', base.family())
+    size = settings.value('display/font_size', base.pointSize(), type=int)
+    return _FONT_STYLE % (family, size)
 
 DARK_STYLE = """
 QMainWindow {
@@ -137,57 +183,167 @@ QMenuBar::item:selected { background: #2d6cdf; color: white; }
 """
 
 
-class SettingsDialog(QDialog):
-    def __init__(self, parent=None, current_theme=SYSTEM_THEME):
+class SavingSettingsDialog(QDialog):
+    # The window that opens this owns the QSettings: the test suite redirects
+    # MainWindow's to an ini file in a temp directory, and a dialog that made
+    # its own would write somewhere the window never reads.
+    def __init__(self, parent=None, settings=None):
         super().__init__(parent)
-        self.setWindowTitle('Settings')
-        self.resize(400, 200)
+        self.setWindowTitle('Saving Settings')
+        self.resize(350, 180)
+        self.settings = settings if settings is not None else parent.settings
 
         layout = QVBoxLayout(self)
 
-        theme_label = QLabel('Theme:')
-        layout.addWidget(theme_label)
+        # --- Backup section
+        backup_group = QGroupBox('Backup')
+        backup_group_layout = QVBoxLayout(backup_group)
 
-        self.theme_group = QButtonGroup(self)
+        self.backup_checkbox = QCheckBox('Enable backup on save')
+        self.backup_checkbox.setChecked(
+            self.settings.value('backup/enabled', True, type=bool))
+        backup_group_layout.addWidget(self.backup_checkbox)
 
-        light_radio = QRadioButton('Light')
-        dark_radio = QRadioButton('Dark')
-        system_radio = QRadioButton('System default')
+        keep_backup_layout = QHBoxLayout()
+        keep_backup_layout.addWidget(QLabel('Keep last'))
+        self.backup_count_spinbox = QSpinBox()
+        self.backup_count_spinbox.setMinimum(1)
+        self.backup_count_spinbox.setMaximum(20)
+        self.backup_count_spinbox.setValue(
+            self.settings.value('backup/keep_count', 5, type=int))
+        keep_backup_layout.addWidget(self.backup_count_spinbox)
+        keep_backup_layout.addWidget(QLabel('backups'))
+        keep_backup_layout.addStretch()
+        backup_group_layout.addLayout(keep_backup_layout)
 
-        self.theme_group.addButton(light_radio, 0)
-        self.theme_group.addButton(dark_radio, 1)
-        self.theme_group.addButton(system_radio, 2)
+        layout.addWidget(backup_group)
 
-        layout.addWidget(light_radio)
-        layout.addWidget(dark_radio)
-        layout.addWidget(system_radio)
+        # --- Auto-save section
+        autosave_group = QGroupBox('Auto-save')
+        autosave_group_layout = QVBoxLayout(autosave_group)
 
-        if current_theme == LIGHT_THEME:
-            light_radio.setChecked(True)
-        elif current_theme == DARK_THEME:
-            dark_radio.setChecked(True)
-        else:
-            system_radio.setChecked(True)
+        self.autosave_checkbox = QCheckBox('Enable auto-save on change')
+        self.autosave_checkbox.setChecked(
+            self.settings.value('autosave/enabled', False, type=bool))
+        autosave_group_layout.addWidget(self.autosave_checkbox)
 
+        layout.addWidget(autosave_group)
         layout.addStretch()
 
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-
         ok_btn = QPushButton('OK')
         cancel_btn = QPushButton('Cancel')
         ok_btn.clicked.connect(self.accept)
         cancel_btn.clicked.connect(self.reject)
-
         button_layout.addWidget(ok_btn)
         button_layout.addWidget(cancel_btn)
         layout.addLayout(button_layout)
 
-    def get_theme(self):
-        checked_id = self.theme_group.checkedId()
-        if checked_id == 0:
-            return LIGHT_THEME
-        elif checked_id == 1:
-            return DARK_THEME
-        else:
-            return SYSTEM_THEME
+    def get_backup_enabled(self):
+        return self.backup_checkbox.isChecked()
+
+    def get_backup_keep_count(self):
+        return self.backup_count_spinbox.value()
+
+    def get_autosave_enabled(self):
+        return self.autosave_checkbox.isChecked()
+
+    def save_settings(self):
+        self.settings.setValue('backup/enabled', self.get_backup_enabled())
+        self.settings.setValue('backup/keep_count', self.get_backup_keep_count())
+        self.settings.setValue('autosave/enabled', self.get_autosave_enabled())
+
+
+class DisplaySettingsDialog(QDialog):
+    def __init__(self, parent=None, settings=None, base_font=None):
+        super().__init__(parent)
+        self.setWindowTitle('Display Settings')
+        self.resize(400, 200)
+        self.settings = settings if settings is not None else parent.settings
+        # What "Reset to default" goes back to: the font the window started
+        # with, before any of this touched it.
+        self._default_font = default_font(base_font)
+
+        layout = QVBoxLayout(self)
+
+        # --- Font section
+        font_group = QGroupBox('Font')
+        font_group_layout = QVBoxLayout(font_group)
+
+        font_layout = QHBoxLayout()
+        font_layout.addWidget(QLabel('Font:'))
+        self.font_combo = QFontComboBox()
+
+        current_font = self.settings.value('display/font',
+                                           self._default_font.family())
+        self.font_combo.setCurrentFont(QFont(current_font))
+        font_layout.addWidget(self.font_combo)
+        font_group_layout.addLayout(font_layout)
+
+        size_layout = QHBoxLayout()
+        size_layout.addWidget(QLabel('Font size:'))
+        self.font_size_spinbox = QSpinBox()
+        self.font_size_spinbox.setMinimum(8)
+        self.font_size_spinbox.setMaximum(24)
+        self.font_size_spinbox.setValue(
+            self.settings.value('display/font_size',
+                                self._default_font.pointSize(), type=int))
+        size_layout.addWidget(self.font_size_spinbox)
+        size_layout.addWidget(QLabel('pt'))
+        size_layout.addStretch()
+        font_group_layout.addLayout(size_layout)
+
+        layout.addWidget(font_group)
+
+        # --- Grid section
+        grid_group = QGroupBox('Grid')
+        grid_group_layout = QVBoxLayout(grid_group)
+
+        row_height_layout = QHBoxLayout()
+        row_height_layout.addWidget(QLabel('Row height:'))
+        self.row_height_spinbox = QSpinBox()
+        self.row_height_spinbox.setMinimum(16)
+        self.row_height_spinbox.setMaximum(48)
+        self.row_height_spinbox.setValue(
+            self.settings.value('display/row_height', DEFAULT_ROW_HEIGHT,
+                                type=int))
+        row_height_layout.addWidget(self.row_height_spinbox)
+        row_height_layout.addWidget(QLabel('px'))
+        row_height_layout.addStretch()
+        grid_group_layout.addLayout(row_height_layout)
+
+        layout.addWidget(grid_group)
+        layout.addStretch()
+
+        button_layout = QHBoxLayout()
+        reset_btn = QPushButton('Reset to default')
+        reset_btn.clicked.connect(self._reset_to_default)
+        button_layout.addWidget(reset_btn)
+        button_layout.addStretch()
+        ok_btn = QPushButton('OK')
+        cancel_btn = QPushButton('Cancel')
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn.clicked.connect(self.reject)
+        button_layout.addWidget(ok_btn)
+        button_layout.addWidget(cancel_btn)
+        layout.addLayout(button_layout)
+
+    def _reset_to_default(self):
+        self.font_combo.setCurrentFont(self._default_font)
+        self.font_size_spinbox.setValue(self._default_font.pointSize())
+        self.row_height_spinbox.setValue(DEFAULT_ROW_HEIGHT)
+
+    def get_font(self):
+        return self.font_combo.currentFont().family()
+
+    def get_font_size(self):
+        return self.font_size_spinbox.value()
+
+    def get_row_height(self):
+        return self.row_height_spinbox.value()
+
+    def save_settings(self):
+        self.settings.setValue('display/font', self.get_font())
+        self.settings.setValue('display/font_size', self.get_font_size())
+        self.settings.setValue('display/row_height', self.get_row_height())

@@ -26,7 +26,22 @@ TAGLINE = ('Editor for Battle Realms game data in the newer Battle Realms.xlsx '
 # belongs in CLAUDE.md and the detail of how it works belongs in README.md.
 # One or two lines a bullet, a handful of bullets a release.
 CHANGELOG = [
-    ('1.5.0', 'current', [
+    ('1.6.0', 'current', [
+        '<b>A dark theme.</b> <i>Settings &gt; Themes</i> switches between '
+        'light, dark, and whatever the system is set to, and remembers which '
+        'you picked.',
+        '<b>The font is yours to choose.</b> <i>Settings &gt; Display</i> sets '
+        'the typeface, its size, and how tall a grid row is, with a '
+        '<i>Reset to default</i> that puts back what the editor started with.',
+        '<b>Backups can be turned off, or kept short.</b> <i>Settings &gt; '
+        'Saving</i> stops the timestamped <code>.bak</code> appearing beside '
+        'your workbook on every save, or caps it at the last few so the folder '
+        'stays tidy.',
+        '<b>Auto-save, if you want it.</b> Off by default. Turn it on and '
+        'every edit is written to the file as you make it, and '
+        '<code>Ctrl+Z</code> still undoes as normal.',
+    ]),
+    ('1.5.0', '', [
         "<b>Open the game's old <code>.dat</code> file.</b> "
         '<i>File &gt; Open old .dat file...</i> reads Battle Realms.dat, the '
         'format the spreadsheet replaced, so an old mod can still be read '
