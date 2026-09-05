@@ -91,6 +91,14 @@ QLineEdit {
     background: #2d2d2d; color: #f0f0f0;
 }
 QToolBar { border-bottom: 1px solid #3d3d3d; spacing: 4px; padding: 3px; background: #2d2d2d; }
+/* The one toolbar button that leaves the editor, so it is the one that does
+   not look like the rest of the row. */
+#LaunchButton {
+    color: white; background: #2e7d32; border: none; border-radius: 4px;
+    padding: 4px 12px; margin-left: 6px; font-weight: bold;
+}
+#LaunchButton:hover { background: #43a047; }
+#LaunchButton:disabled { color: #6d6d6d; background: #353535; font-weight: normal; }
 QMenuBar { background: #2d2d2d; border-bottom: 1px solid #3d3d3d; color: #f0f0f0; }
 QMenuBar::item { padding: 5px 11px; }
 QMenuBar::item:selected { background: #2d6cdf; color: white; }
@@ -159,6 +167,14 @@ QHeaderView::section {
 }
 QLineEdit { padding: 4px 6px; border: 1px solid #c9ced6; border-radius: 4px; }
 QToolBar { border-bottom: 1px solid #dfe3e8; spacing: 4px; padding: 3px; }
+/* The one toolbar button that leaves the editor, so it is the one that does
+   not look like the rest of the row. */
+#LaunchButton {
+    color: white; background: #2e7d32; border: none; border-radius: 4px;
+    padding: 4px 12px; margin-left: 6px; font-weight: bold;
+}
+#LaunchButton:hover { background: #388e3c; }
+#LaunchButton:disabled { color: #9aa5b1; background: #edf0f3; font-weight: normal; }
 QMenuBar { background: #f4f6f9; border-bottom: 1px solid #dfe3e8; }
 QMenuBar::item { padding: 5px 11px; }
 QMenuBar::item:selected { background: #2d6cdf; color: white; }

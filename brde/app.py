@@ -13,8 +13,9 @@ import os
 import sys
 import traceback
 
-from PyQt6.QtCore import QSettings, Qt, QTimer
-from PyQt6.QtGui import QAction, QFont, QIcon, QKeySequence, QUndoStack
+from PyQt6.QtCore import QProcess, QSettings, Qt, QTimer, QUrl
+from PyQt6.QtGui import (QAction, QDesktopServices, QFont, QIcon, QKeySequence,
+                         QUndoStack)
 from PyQt6.QtWidgets import (QApplication, QCheckBox, QDialog, QFileDialog,
                              QHBoxLayout, QHeaderView, QInputDialog, QLabel,
                              QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
@@ -22,7 +23,8 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QDialog, QFileDialog,
                              QPushButton, QSizePolicy, QSplitter, QStackedWidget,
                              QStatusBar, QTableView, QToolBar, QVBoxLayout, QWidget)
 
-from . import about, compare, core, detail, matchup, matchup_ui, settings
+from . import (about, compare, core, detail, launch, matchup, matchup_ui,
+               settings)
 from .model import (EnumDelegate, MultiSetCommand, RowFilter, SetValueCommand,
                     SheetModel, ask_colour, coerce, pick_label)
 
@@ -46,6 +48,14 @@ QHeaderView::section {
 }
 QLineEdit { padding: 4px 6px; border: 1px solid #c9ced6; border-radius: 4px; }
 QToolBar { border-bottom: 1px solid #dfe3e8; spacing: 4px; padding: 3px; }
+/* The one toolbar button that leaves the editor, so it is the one that does
+   not look like the rest of the row. */
+#LaunchButton {
+    color: white; background: #2e7d32; border: none; border-radius: 4px;
+    padding: 4px 12px; margin-left: 6px; font-weight: bold;
+}
+#LaunchButton:hover { background: #388e3c; }
+#LaunchButton:disabled { color: #9aa5b1; background: #edf0f3; font-weight: normal; }
 QMenuBar { background: #f4f6f9; border-bottom: 1px solid #dfe3e8; }
 QMenuBar::item { padding: 5px 11px; }
 QMenuBar::item:selected { background: #2d6cdf; color: white; }
@@ -114,6 +124,7 @@ KEYBOARD SHORTCUTS
   Ctrl+Shift+I        details for the selected row
   Ctrl+U              compare two units
   Ctrl+Shift+U        compare the selected unit
+  F5                  launch the game
   F1                  show this help
 
 RECORD DETAILS  (Record > Find record..., Ctrl+I)
@@ -166,6 +177,18 @@ COMPARING TWO UNITS  (Compare > Compare units..., Ctrl+U)
   "Apply techniques" recomputes everything as fully upgraded; values a
   technique moves are shown as "base -> upgraded".
   Ctrl+Shift+U, or right-clicking a row in Data_Units, loads that unit.
+
+STARTING THE GAME  (Game > Launch game, F5)
+  There is no game path to set. The file you have open says where the game
+  is: if it sits anywhere inside the Steam copy of Battle Realms the game is
+  started through Steam, and otherwise the game's own .exe is looked for
+  beside the file and in the few folders above it, and run directly.
+  Unsaved edits are offered a save first - the game reads the file off disk
+  as it starts, so launching without saving tests the old numbers.
+  If the workbook you have open is a copy kept somewhere else, you are told
+  so before the game starts, because that run will not see your edits.
+  "Launch map editor" runs WorldMaster.exe from the same folder, and
+  "Open game folder" just shows the folder in Explorer.
 
 SAVING
   Ctrl+S overwrites the open file and creates a timestamped .bak copy first.
@@ -306,6 +329,17 @@ class MainWindow(QMainWindow):
         self.a_theme_system = mkact('&System default', lambda: self.on_set_theme(settings.SYSTEM_THEME))
         self.a_saving = mkact('&Saving...', self.on_saving)
         self.a_display = mkact('&Display...', self.on_display)
+        # The launch actions take no game path of their own: brde.launch works
+        # it out from the file that is open. See its docstring for the rule.
+        self.a_launch = mkact(
+            '&Launch game', self.on_launch_game, 'F5',
+            'Start Battle Realms from the folder the open file belongs to')
+        self.a_launch_editor = mkact(
+            'Launch &map editor', self.on_launch_editor, None,
+            'Start WorldMaster.exe, the map editor that ships with the game')
+        self.a_game_folder = mkact(
+            'Open game &folder', self.on_open_game_folder, None,
+            'Show the folder the game will be started from')
         self.a_help = mkact('&How to use', self.on_help, 'F1')
         self.a_about = mkact('&About', self.on_about)
 
@@ -357,6 +391,14 @@ class MainWindow(QMainWindow):
         m_cmp.addAction(self.a_matchup)
         m_cmp.addAction(self.a_matchup_row)
 
+        # Its own menu rather than a line in File: File is about the workbook,
+        # and the game is a different object entirely.
+        m_game = mb.addMenu('&Game')
+        m_game.addAction(self.a_launch)
+        m_game.addAction(self.a_launch_editor)
+        m_game.addSeparator()
+        m_game.addAction(self.a_game_folder)
+
         m_settings = mb.addMenu('&Settings')
         m_theme = m_settings.addMenu('&Themes')
         m_theme.addAction(self.a_theme_light)
@@ -400,6 +442,21 @@ class MainWindow(QMainWindow):
             lambda: self.proxy.set_needle(self.ed_filter.text()))
         self.ed_filter.textChanged.connect(lambda _t: self._filter_timer.start())
         tb.addWidget(self.ed_filter)
+
+        # Pushed to the far right on purpose. This is the one button that
+        # leaves the editor, and a stray click on it costs a game boot, so it
+        # does not belong next to Save and Revert.
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding,
+                             QSizePolicy.Policy.Preferred)
+        tb.addWidget(spacer)
+        tb.addAction(self.a_launch)
+        btn_launch = tb.widgetForAction(self.a_launch)
+        if btn_launch is not None:
+            # Colour rather than an icon or a glyph: the user can change
+            # the typeface in Settings > Display, and a font without the
+            # arrow would leave a box sitting in the button.
+            btn_launch.setObjectName('LaunchButton')
 
         # ---- left: sheet list
         left = QWidget()
@@ -622,7 +679,8 @@ class MainWindow(QMainWindow):
         for a in (self.a_close, self.a_copy, self.a_find, self.a_gosheet,
                   self.a_desc, self.a_detail, self.a_detail_row,
                   self.a_compare, self.a_cmp_again, self.a_matchup,
-                  self.a_matchup_row):
+                  self.a_matchup_row, self.a_launch, self.a_launch_editor,
+                  self.a_game_folder):
             a.setEnabled(on)
         # Everything that would change or write the file. A .dat is browsed,
         # compared and searched like any other file; it is only never altered.
@@ -966,6 +1024,116 @@ class MainWindow(QMainWindow):
         row_height = self.settings.value('display/row_height',
                                          settings.DEFAULT_ROW_HEIGHT, type=int)
         self.tbl.verticalHeader().setDefaultSectionSize(row_height)
+
+    # --------------------------------------------------------------- game
+    def _game_target(self, quiet=False):
+        """Where the game is, or None after telling the user it is nowhere.
+
+        `brde.launch` decides; this only reports. The message names the folder
+        that was searched, because "not found" without a path is no help at all
+        when the workbook turns out to be a copy kept somewhere else.
+        """
+        if not self.book:
+            return None
+        target = launch.resolve(self.book.path)
+        if target.kind != 'none':
+            return target
+        if not quiet:
+            QMessageBox.warning(
+                self, APP_NAME,
+                'Could not work out which copy of the game to start.\n\n'
+                'The open file is not inside a Steam installation of Battle '
+                'Realms, and neither\n%s\nnor the folders above it hold %s.'
+                '\n\nOpen the workbook that sits in your game folder and try '
+                'again.'
+                % (target.folder, ' or '.join(launch.GAME_EXES)))
+        return None
+
+    def _ready_to_launch(self, target):
+        """Save first if asked to, and warn if the game will read another file.
+
+        The game reads its data at startup out of its own folder, so launching
+        on top of unsaved edits tests the old numbers - the easiest way there
+        is to spend an evening puzzled. A workbook kept outside the game folder
+        is the same trap: it is a copy, and this run will not see it.
+        """
+        if self.book.dirty and not self.book.read_only:
+            r = QMessageBox.question(
+                self, APP_NAME,
+                '%d cells are still unsaved, and the game reads the file as it '
+                'is on disk.\n\nSave them before starting?'
+                % len(self.book.edits),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                | QMessageBox.StandardButton.Cancel)
+            if r == QMessageBox.StandardButton.Cancel:
+                return False
+            if r == QMessageBox.StandardButton.Yes:
+                self._do_save(self.book.path)
+                if self.book.dirty:      # the save failed and has already said so
+                    return False
+
+        here = os.path.dirname(os.path.abspath(self.book.path))
+        if os.path.normcase(here) != os.path.normcase(
+                os.path.abspath(target.folder)):
+            r = QMessageBox.question(
+                self, APP_NAME,
+                'The game will start from\n%s\nand read its data from there. '
+                'The file you have open is somewhere else, so this run will '
+                'not use your edits.\n\nStart it anyway?' % target.folder,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if r != QMessageBox.StandardButton.Yes:
+                return False
+        return True
+
+    def _start_exe(self, exe, folder):
+        ok, _pid = QProcess.startDetached(exe, [], folder)
+        if not ok:
+            QMessageBox.critical(self, APP_NAME, 'Could not start\n%s' % exe)
+            return False
+        self.lbl_status.setText('Started %s' % os.path.basename(exe))
+        return True
+
+    def on_launch_game(self):
+        target = self._game_target()
+        if target is None or not self._ready_to_launch(target):
+            return
+        if target.kind == 'steam':
+            # Through Steam rather than straight at the .exe: Steam owns the
+            # DRM check, the overlay and the cloud saves, and the exe on its
+            # own either loses them or refuses to run at all.
+            if QDesktopServices.openUrl(QUrl(launch.steam_url(target.appid))):
+                self.lbl_status.setText(
+                    'Asked Steam to start Battle Realms (app %s)' % target.appid)
+                return
+            if target.exe:               # Steam did not answer - run it direct
+                self._start_exe(target.exe, target.folder)
+                return
+            QMessageBox.warning(
+                self, APP_NAME,
+                'Steam did not answer the launch request. Start Steam and try '
+                'again.')
+            return
+        self._start_exe(target.exe, target.folder)
+
+    def on_launch_editor(self):
+        target = self._game_target()
+        if target is None:
+            return
+        exe = launch.find_exe(target.folder, launch.MAP_EDITOR_EXES)
+        if not exe:
+            QMessageBox.information(
+                self, APP_NAME,
+                'There is no map editor in\n%s\n\n%s ships with some builds '
+                'of the game and not others.'
+                % (target.folder, ' or '.join(launch.MAP_EDITOR_EXES)))
+            return
+        self._start_exe(exe, target.folder)
+
+    def on_open_game_folder(self):
+        target = self._game_target()
+        if target is None:
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(target.folder))
 
     def on_help(self):
         HelpDialog(self).exec()

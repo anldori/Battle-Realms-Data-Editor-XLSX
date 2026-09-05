@@ -221,6 +221,7 @@ held that your workbook does not. **Take other value** is disabled there, since 
 | **Open recent** | The last 8 files are remembered between sessions. |
 | **Auto-save on change** | Off by default. Turn it on in **Settings ▸ Saving** and every edit is written to the file as you make it - `Ctrl+Z` still undoes as normal. |
 | **Automatic backup** | Every save first creates `Battle Realms.xlsx.YYYYMMDD_HHMMSS.bak`. **Settings ▸ Saving** turns this off, or caps it at the last few so the folder stays tidy. |
+| **Launch the game** | `F5`, or the green button at the right of the toolbar. The editor works out which copy of the game your file belongs to - a Steam install starts through Steam, an older loose install starts its own `.exe` - and offers to save your edits first, since the game reads the file as it starts. |
 | **Dark / light theme** | **Settings ▸ Themes** - dark, light, or follow the system. |
 | **Font and row height** | **Settings ▸ Display** sets the font, its size, and how tall a grid row is, with a **Reset to default** that puts back what the editor started with. |
 
@@ -235,6 +236,7 @@ held that your workbook does not. **Take other value** is disabled there, since 
 | **View** | Show enum descriptions · Filter rows · Go to sheet… · List edited cells |
 | **Record** | Find record… (`Ctrl+I`) · Details for the selected row (`Ctrl+Shift+I`) |
 | **Compare** | Compare with another file… (`Ctrl+D`) · Compare with last file again · Show last report · Clear comparison · Compare units… (`Ctrl+U`) · Compare this unit with… (`Ctrl+Shift+U`) |
+| **Game** | Launch game (`F5`) · Launch map editor · Open game folder |
 | **Settings** | Themes ▸ (Light · Dark · System default) · Display… · Saving… |
 | **Help** | How to use (`F1`) · About |
 
