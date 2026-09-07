@@ -45,9 +45,7 @@ python br_editor.py "C:\path\to\Battle Realms.xlsx"  # open a file directly
 For stable releases from the [Releases page](https://github.com/anldori/Battle-Realms-Data-Editor-XLSX/releases), grab a ready-made build - nothing to install. 
 If Windows Defender flags the download, see [If your antivirus flags the .exe](#if-your-antivirus-flags-the-exe).
 
-> **Note:** Latest features (dark theme, improved help dialog) are only in the source code. For the newest features, use the source code method above.
-
-<img width="1442" height="892" alt="image" src="https://github.com/user-attachments/assets/8a26321b-3d30-46d1-814c-6d9a4b641734" />
+<img width="1442" height="892" alt="image" src="https://github.com/user-attachments/assets/6a73e957-5c28-421b-8376-b645b1133176" />
 
 
 ### Opening your file
@@ -79,7 +77,7 @@ previews, and `Ctrl+D` to diff it against a workbook. Nothing in it can be edite
 saved - the title bar shows `[read-only]`, editing is off, and a `.dat` in **Open
 recent** is labelled so you know before you open it.
 
-<img width="1442" height="892" alt="image" src="https://github.com/user-attachments/assets/e84cf1a9-20d9-442e-9683-19524d830d69" />
+<img width="1442" height="892" alt="image" src="https://github.com/user-attachments/assets/f491b298-de34-453a-9e99-fcee3ca9d1f8" />
 
 ---
 
