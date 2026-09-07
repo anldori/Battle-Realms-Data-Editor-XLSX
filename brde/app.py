@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QDialog, QFileDialog,
                              QStatusBar, QTableView, QToolBar, QVBoxLayout, QWidget)
 
 from . import (about, compare, core, detail, launch, matchup, matchup_ui,
-               settings)
+               settings, update)
 from .model import (EnumDelegate, MultiSetCommand, RowFilter, SetValueCommand,
                     SheetModel, ask_colour, coerce, pick_label)
 
@@ -341,6 +341,7 @@ class MainWindow(QMainWindow):
             'Open game &folder', self.on_open_game_folder, None,
             'Show the folder the game will be started from')
         self.a_help = mkact('&How to use', self.on_help, 'F1')
+        self.a_check_updates = mkact('&Check for updates', self.on_check_updates)
         self.a_about = mkact('&About', self.on_about)
 
         # ============================ menu bar
@@ -409,6 +410,7 @@ class MainWindow(QMainWindow):
 
         m_help = mb.addMenu('&Help')
         m_help.addAction(self.a_help)
+        m_help.addAction(self.a_check_updates)
         m_help.addAction(self.a_about)
 
         # ============================ toolbar
@@ -1137,6 +1139,28 @@ class MainWindow(QMainWindow):
 
     def on_help(self):
         HelpDialog(self).exec()
+
+    def on_check_updates(self):
+        release = update.check_for_updates()
+        if release is None:
+            QMessageBox.warning(self, 'Check for updates',
+                'Could not reach GitHub. Please check your internet connection.')
+            return
+
+        from . import __version__
+        if release.is_newer:
+            msg = (f'Version {release.version} is available.\n'
+                   f'You are currently using {__version__}.\n\n'
+                   'Click "Open" to visit the releases page.')
+            result = QMessageBox.information(
+                self, 'Update available', msg,
+                QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Close,
+                QMessageBox.StandardButton.Open)
+            if result == QMessageBox.StandardButton.Open:
+                QDesktopServices.openUrl(QUrl(release.url))
+        else:
+            msg = f'You are using the latest version ({__version__}).'
+            QMessageBox.information(self, 'Up to date', msg)
 
     def on_about(self):
         about.AboutDialog(self).exec()
