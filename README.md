@@ -236,7 +236,7 @@ held that your workbook does not. **Take other value** is disabled there, since 
 | **Compare** | Compare with another file… (`Ctrl+D`) · Compare with last file again · Show last report · Clear comparison · Compare units… (`Ctrl+U`) · Compare this unit with… (`Ctrl+Shift+U`) |
 | **Game** | Launch game (`F5`) · Launch map editor · Open game folder |
 | **Settings** | Themes ▸ (Light · Dark · System default) · Display… · Saving… |
-| **Help** | How to use (`F1`) · About |
+| **Help** | How to use (`F1`) · Check for update · About |
 
 ---
 
