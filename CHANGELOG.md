@@ -3,7 +3,18 @@
 Also shown in **Help ▸ About**, which is the authoritative copy - it is generated from
 `CHANGELOG` in `brde/about.py`.
 
-## 1.6.0 (current)
+## 1.7.0 (current)
+
+- **Launch the game.** A Launch game button finds the game from the open data file.
+- **Assign a first innate ability.** Units without an innate ability now have a
+  searchable ability picker in their record details. Assignments support undo
+  and redo, and the details refresh immediately.
+- **New rows survive reopening.** Saving expands the Excel sheet range so newly
+  added ability links and other appended rows are read back.
+- **Check for updates.** Help > Check for updates checks GitHub for a newer
+  release and opens the releases page when one is available.
+
+## 1.6.0
 
 - **A dark theme.** *Settings ▸ Themes* switches between light, dark, and whatever
   the system is set to, and remembers which you picked.

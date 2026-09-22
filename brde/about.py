@@ -26,7 +26,18 @@ TAGLINE = ('Editor for Battle Realms game data in the newer Battle Realms.xlsx '
 # belongs in CLAUDE.md and the detail of how it works belongs in README.md.
 # One or two lines a bullet, a handful of bullets a release.
 CHANGELOG = [
-    ('1.6.0', 'current', [
+    ('1.7.0', 'current', [
+        '<b>Launch the game.</b> A Launch game button finds the game from the '
+        'open data file.',
+        '<b>Assign a first innate ability.</b> Units without an innate ability '
+        'now have a searchable ability picker in their record details. '
+        'Assignments support undo and redo, and the details refresh immediately.',
+        '<b>New rows survive reopening.</b> Saving expands the Excel sheet range '
+        'so newly added ability links and other appended rows are read back.',
+        '<b>Check for updates.</b> Help > Check for updates checks GitHub for a '
+        'newer release and opens the releases page when one is available.',
+    ]),
+    ('1.6.0', '', [
         '<b>A dark theme.</b> <i>Settings &gt; Themes</i> switches between '
         'light, dark, and whatever the system is set to, and remembers which '
         'you picked.',
