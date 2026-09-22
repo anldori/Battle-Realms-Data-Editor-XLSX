@@ -20,5 +20,5 @@ Module layout, in dependency order - nothing here imports anything above it:
     app        the main window, wiring all of the above together
 """
 
-__version__ = '1.7.0'
+__version__ = '1.8.0'
 __all__ = ['__version__']

@@ -26,7 +26,18 @@ TAGLINE = ('Editor for Battle Realms game data in the newer Battle Realms.xlsx '
 # belongs in CLAUDE.md and the detail of how it works belongs in README.md.
 # One or two lines a bullet, a handful of bullets a release.
 CHANGELOG = [
-    ('1.7.0', 'current', [
+    ('1.8.0', 'current', [
+        '<b>Copy and paste work with zero values.</b> Copying a value such as '
+        'Data_Abilities.UsageType = 0 now preserves the code instead of '
+        'copying an empty string.',
+        '<b>Grid shortcuts work again.</b> Ctrl+C, Ctrl+V and Delete share '
+        'the menu actions without conflicting shortcut registrations. '
+        'Paste and clear also respect read-only files.',
+        '<b>Paste into the rows you see.</b> Multi-row paste follows the '
+        'visible rows when a filter is active. A trailing newline copied '
+        'from Excel no longer clears the next row.',
+    ]),
+    ('1.7.0', '', [
         '<b>Launch the game.</b> A Launch game button finds the game from the '
         'open data file.',
         '<b>Assign a first innate ability.</b> Units without an innate ability '

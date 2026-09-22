@@ -3,7 +3,19 @@
 Also shown in **Help ▸ About**, which is the authoritative copy - it is generated from
 `CHANGELOG` in `brde/about.py`.
 
-## 1.7.0 (current)
+## 1.8.0 (current)
+
+- **Copy and paste work with zero values.** Copying a value such as
+  `Data_Abilities.UsageType = 0` now preserves the code instead of copying an
+  empty string.
+- **Grid shortcuts work again.** `Ctrl+C`, `Ctrl+V` and `Delete` share the menu
+  actions without conflicting shortcut registrations. Paste and clear also
+  respect read-only files.
+- **Paste into the rows you see.** Multi-row paste follows the visible rows when
+  a filter is active. A trailing newline copied from Excel no longer clears the
+  next row.
+
+## 1.7.0
 
 - **Launch the game.** A Launch game button finds the game from the open data file.
 - **Assign a first innate ability.** Units without an innate ability now have a

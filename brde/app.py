@@ -525,12 +525,9 @@ class MainWindow(QMainWindow):
 
         self._apply_display()
 
-        # copy / paste / clear shortcuts scoped to the table
-        for seq, fn in (('Ctrl+C', self.on_copy), ('Ctrl+V', self.on_paste),
-                        ('Delete', self.on_clear)):
-            a = QAction(self)
-            a.setShortcut(QKeySequence(seq))
-            a.triggered.connect(fn)
+        # Reuse the menu actions: a second action with the same shortcut makes
+        # Qt reject the key as ambiguous. Scope them to the grid and its editors.
+        for a in (self.a_copy, self.a_paste, self.a_clear):
             a.setShortcutContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
             self.tbl.addAction(a)
 
@@ -1176,27 +1173,34 @@ class MainWindow(QMainWindow):
         idxs.sort(key=lambda i: (i.row(), i.column()))
         rows = {}
         for i in idxs:
+            value = i.data(Qt.ItemDataRole.EditRole)
             rows.setdefault(i.row(), []).append(
-                str(i.data(Qt.ItemDataRole.EditRole) or ''))
+                '' if value is None else str(value))
         txt = '\n'.join('\t'.join(v) for _k, v in sorted(rows.items()))
         QApplication.clipboard().setText(txt)
         self.lbl_status.setText(f'Copied {len(idxs)} cells')
 
     def on_paste(self):
-        if not self.model:
+        if not self.model or self.book.read_only:
             return
         txt = QApplication.clipboard().text()
         cur = self.tbl.currentIndex()
         if not txt or not cur.isValid():
             return
-        base = self.proxy.mapToSource(cur)
-        grid = [line.split('\t') for line in txt.replace('\r\n', '\n').split('\n')]
+        # Excel terminates its last row with a newline; that terminator is not
+        # another empty row to paste over the next record.
+        txt = txt.replace('\r\n', '\n').replace('\r', '\n')
+        if txt.endswith('\n'):
+            txt = txt[:-1]
+        grid = [line.split('\t') for line in txt.split('\n')]
         cells = []
         for dr, line in enumerate(grid):
             for dc, raw in enumerate(line):
-                r, c = base.row() + dr, base.column() + dc
-                if r >= self.model.rowCount() or c >= self.model.columnCount():
+                target = self.proxy.index(cur.row() + dr, cur.column() + dc)
+                if not target.isValid():
                     continue
+                source = self.proxy.mapToSource(target)
+                r, c = source.row(), source.column()
                 old = self.model.raw(r, c)
                 new = coerce(raw, old)
                 if new != old:
@@ -1207,7 +1211,7 @@ class MainWindow(QMainWindow):
             self.lbl_status.setText(f'Pasted {len(cells)} cells')
 
     def on_clear(self):
-        if not self.model:
+        if not self.model or self.book.read_only:
             return
         cells = []
         for i in self._sel_source():
@@ -1622,10 +1626,8 @@ class MainWindow(QMainWindow):
             a2 = m.addAction(f'Open code table Enum_{tbl.name}')
             a2.triggered.connect(lambda: self._jump_to_enum(tbl.name, val))
             m.addSeparator()
-        a3 = m.addAction('Copy\tCtrl+C')
-        a3.triggered.connect(self.on_copy)
-        a4 = m.addAction('Paste\tCtrl+V')
-        a4.triggered.connect(self.on_paste)
+        m.addAction(self.a_copy)
+        m.addAction(self.a_paste)
         a5 = m.addAction('Revert to original\tCtrl+R')
         a5.triggered.connect(self.on_revert_cell)
         m.addSeparator()
