@@ -1268,6 +1268,7 @@ class MainWindow(QMainWindow):
             d = detail.DetailWindow(self.book, self)
             d.jumpRequested.connect(self._on_detail_jump)
             d.editRequested.connect(self._on_detail_edit)
+            d.abilityRequested.connect(self._on_detail_ability)
             d.colourRequested.connect(self._apply_colour)
             d.finished.connect(self._on_detail_closed)
             self._detail_dlg = d
@@ -1325,6 +1326,32 @@ class MainWindow(QMainWindow):
         if new == old:
             return
         self.undo.push(SetValueCommand(model, row, col, old, new))
+
+    def _on_detail_ability(self, unit_code, value):
+        """Create a unit/ability link as one undoable edit."""
+        if not self.book or self.book.read_only:
+            return
+        sheet = 'Data_UnitAndInnateAbilities'
+        c_unit = detail._col(self.book, sheet, 'UnitType')
+        c_ability = detail._col(self.book, sheet, 'AbilityType')
+        if c_unit is None or c_ability is None:
+            return
+        ability = coerce(value, None)
+        enum = self.book.enum_for(sheet, c_ability)
+        if (not isinstance(ability, int) or ability == -1
+                or enum is None or ability not in enum.code2desc):
+            return
+        model = self._model_for(sheet)
+        count = detail._effective_row_count(self.book, sheet)
+        row = next((r for r in range(count)
+                    if self.book.value(sheet, r, c_unit) == unit_code), count)
+        if row >= model.rowCount():
+            model.append_rows(row + 1 - model.rowCount())
+        cells = [(row, c, model.raw(row, c), new)
+                 for c, new in ((c_unit, unit_code), (c_ability, ability))
+                 if model.raw(row, c) != new]
+        if cells:
+            self.undo.push(MultiSetCommand(model, cells, 'Assign innate ability'))
 
     # ------------------------------------------------------------- matchup
     def on_matchup(self):

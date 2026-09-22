@@ -18,7 +18,7 @@ Two layers build the page:
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
+from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont
 from PyQt6.QtWidgets import (QAbstractItemView, QComboBox, QCompleter, QDialog,
                              QHBoxLayout, QHeaderView, QLabel, QLineEdit,
@@ -144,6 +144,16 @@ class Field:
         self.col = col
         self.indent = indent
         self.link = link          # (sheet, row) to open when double-clicked
+
+
+class UnassignedAbility(Field):
+    """An editable ability picker before a unit has a join-sheet row."""
+
+    __slots__ = ('unit_code',)
+
+    def __init__(self, unit_code, col):
+        super().__init__('Innate ability 1', 'Data_UnitAndInnateAbilities', 0, col)
+        self.unit_code = unit_code
 
 
 class Note:
@@ -309,6 +319,12 @@ def _ability_block(book, code, indent=0):
     return out, arow
 
 
+def _effective_row_count(book, sheet):
+    """Include rows added through pending edits but not yet saved."""
+    return max(len(book.sheets[sheet].rows),
+               max((r + 1 for sh, r, _c in book.edits if sh == sheet), default=0))
+
+
 def _unit_abilities(book, sheet, row):
     """Innate abilities, read from the Data_UnitAndInnateAbilities join sheet.
 
@@ -327,7 +343,7 @@ def _unit_abilities(book, sheet, row):
     if c_unit is None or c_ab is None:
         return out
     n = 0
-    for i in range(len(sd.rows)):
+    for i in range(_effective_row_count(book, join)):
         if book.value(join, i, c_unit) != code:
             continue
         n += 1
@@ -338,7 +354,7 @@ def _unit_abilities(book, sheet, row):
         out.append(f)
         out.extend(stats)
     if not out:
-        out.append(Note('No innate abilities', ''))
+        out.append(UnassignedAbility(code, c_ab))
     return out
 
 
@@ -909,6 +925,8 @@ class RecordIndex:
 class DetailModel(QAbstractTableModel):
     """Flat list of section headers and fields. The value column is editable."""
 
+    abilityRequested = pyqtSignal(int, object)  # unit code, ability value
+
     HEADERS = ['Field', 'Value']
 
     def __init__(self, book, push_edit, parent=None):
@@ -1016,6 +1034,15 @@ class DetailModel(QAbstractTableModel):
                 return 'Double-click to open this record'
             return None
 
+        if isinstance(it, UnassignedAbility):
+            if role == Qt.ItemDataRole.DisplayRole:
+                return it.label if c == 0 else '(none - choose an ability)'
+            if role == Qt.ItemDataRole.EditRole and c == 1:
+                return ''
+            if role == Qt.ItemDataRole.ToolTipRole:
+                return 'Double-click the value to assign an innate ability.'
+            return None
+
         # Field
         if role == Qt.ItemDataRole.DisplayRole:
             if c == 0:
@@ -1060,11 +1087,15 @@ class DetailModel(QAbstractTableModel):
         return base
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
-        if role != Qt.ItemDataRole.EditRole or not index.isValid():
+        if (self.book.read_only or role != Qt.ItemDataRole.EditRole
+                or not index.isValid()):
             return False
         it = self.rows[index.row()]
         if not isinstance(it, Field) or index.column() != 1:
             return False
+        if isinstance(it, UnassignedAbility):
+            self.abilityRequested.emit(it.unit_code, value)
+            return True
         self.push_edit(it.sheet, it.row, it.col, value)
         return True
 
@@ -1125,6 +1156,7 @@ class DetailWindow(QDialog):
 
     jumpRequested = pyqtSignal(str, int, int)              # sheet, row, col
     editRequested = pyqtSignal(str, int, int, object)      # sheet, row, col, value
+    abilityRequested = pyqtSignal(int, object)
     # sheet, row, ColourGroup, [(col, value)] - one undo step for a whole colour
     colourRequested = pyqtSignal(str, int, object, object)
 
@@ -1134,6 +1166,9 @@ class DetailWindow(QDialog):
         self.index = RecordIndex(book)
         self._history = []
         self._current = None
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.setSingleShot(True)
+        self._refresh_timer.timeout.connect(self._refresh_page)
 
         self.setWindowTitle('View details')
         self.resize(1080, 720)
@@ -1180,6 +1215,7 @@ class DetailWindow(QDialog):
         rv.addLayout(bar)
 
         self.model = DetailModel(book, self._push_edit, self)
+        self.model.abilityRequested.connect(self.abilityRequested.emit)
         self.tbl = QTableView()
         self.tbl.setModel(self.model)
         self.tbl.setItemDelegate(DetailDelegate(book, self.tbl))
@@ -1303,7 +1339,7 @@ class DetailWindow(QDialog):
         if getattr(it, 'link', None):
             a = m.addAction('Open this record')
             a.triggered.connect(lambda: self.show_record(*it.link))
-        if isinstance(it, Field):
+        if isinstance(it, Field) and not isinstance(it, UnassignedAbility):
             a2 = m.addAction(f'Show in grid ({it.sheet})')
             a2.triggered.connect(
                 lambda: self.jumpRequested.emit(it.sheet, it.row, it.col))
@@ -1316,4 +1352,14 @@ class DetailWindow(QDialog):
 
     def refresh(self):
         """Called by the main window whenever a cell changes anywhere."""
-        self.model.refresh()
+        # Rebuild after the editor has committed and multi-cell commands finish.
+        # Unit ability rows can appear/disappear on assignment or undo.
+        self._refresh_timer.start(0)
+
+    def _refresh_page(self):
+        if self.model.sheet == 'Data_Units':
+            scroll = self.tbl.verticalScrollBar().value()
+            self.model.set_record(self.model.sheet, self.model.row)
+            self.tbl.verticalScrollBar().setValue(scroll)
+        else:
+            self.model.refresh()

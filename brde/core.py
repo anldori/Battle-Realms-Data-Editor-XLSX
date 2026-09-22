@@ -593,6 +593,22 @@ def _patch_sheet(xml: str, cells: dict[tuple[int, int], object], sst_id) -> str:
     for nr in sorted(n for n in by_row if n not in handled):
         out.append(_new_row(nr, by_row[nr], style_hint, sst_id))
 
+    # Readers such as openpyxl's read-only mode stop at the declared range.
+    # Appended records must expand it as well as adding their row elements.
+    dimension = re.search(r'<dimension\b[^>]*\bref="([A-Z]+[0-9]+)(?::([A-Z]+[0-9]+))?"', head)
+    if dimension and cells:
+        first = dimension.group(1)
+        last = dimension.group(2) or first
+        end = re.fullmatch(r'([A-Z]+)([0-9]+)', last)
+        max_col = max(col_index(end.group(1)), max(c for _r, c in cells))
+        max_row = max(int(end.group(2)), max(r + 2 for r, _c in cells))
+        new_last = f'{col_letter(max_col)}{max_row}'
+        if new_last != last:
+            start, stop = dimension.span(1)
+            if dimension.group(2):
+                stop = dimension.end(2)
+            head = head[:start] + f'{first}:{new_last}' + head[stop:]
+
     return head + ''.join(out) + tail
 
 
