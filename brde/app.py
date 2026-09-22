@@ -1187,6 +1187,17 @@ class MainWindow(QMainWindow):
         cur = self.tbl.currentIndex()
         if not txt or not cur.isValid():
             return
+        # A selection has its own, visible paste origin.  In particular,
+        # QTableView.selectAll() leaves currentIndex() wherever the cursor was
+        # before, which used to shift a whole-sheet paste by that stale row and
+        # column.  Use the selection's top-left corner; the ordinary one-cell
+        # case is unchanged because that cell is both current and selected.
+        selected = self.tbl.selectedIndexes()
+        if selected:
+            base_row = min(i.row() for i in selected)
+            base_col = min(i.column() for i in selected)
+        else:
+            base_row, base_col = cur.row(), cur.column()
         # Excel terminates its last row with a newline; that terminator is not
         # another empty row to paste over the next record.
         txt = txt.replace('\r\n', '\n').replace('\r', '\n')
@@ -1196,7 +1207,7 @@ class MainWindow(QMainWindow):
         cells = []
         for dr, line in enumerate(grid):
             for dc, raw in enumerate(line):
-                target = self.proxy.index(cur.row() + dr, cur.column() + dc)
+                target = self.proxy.index(base_row + dr, base_col + dc)
                 if not target.isValid():
                     continue
                 source = self.proxy.mapToSource(target)

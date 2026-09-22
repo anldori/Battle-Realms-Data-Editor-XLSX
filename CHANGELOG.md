@@ -3,7 +3,13 @@
 Also shown in **Help ▸ About**, which is the authoritative copy - it is generated from
 `CHANGELOG` in `brde/about.py`.
 
-## 1.8.0 (current)
+## 1.8.1 (current)
+
+- **Select All pastes from the top-left cell.** Whole-sheet copies from a
+  read-only `.dat` file now line up with the open workbook instead of starting
+  at whichever cell previously held the cursor.
+
+## 1.8.0
 
 - **Copy and paste work with zero values.** Copying a value such as
   `Data_Abilities.UsageType = 0` now preserves the code instead of copying an

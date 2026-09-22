@@ -26,7 +26,12 @@ TAGLINE = ('Editor for Battle Realms game data in the newer Battle Realms.xlsx '
 # belongs in CLAUDE.md and the detail of how it works belongs in README.md.
 # One or two lines a bullet, a handful of bullets a release.
 CHANGELOG = [
-    ('1.8.0', 'current', [
+    ('1.8.1', 'current', [
+        '<b>Select All pastes from the top-left cell.</b> Whole-sheet copies '
+        'from a read-only .dat file now line up with the open workbook instead '
+        'of starting at whichever cell previously held the cursor.',
+    ]),
+    ('1.8.0', '', [
         '<b>Copy and paste work with zero values.</b> Copying a value such as '
         'Data_Abilities.UsageType = 0 now preserves the code instead of '
         'copying an empty string.',
