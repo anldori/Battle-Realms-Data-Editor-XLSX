@@ -87,10 +87,10 @@ if defined MODE goto chosen
 
 echo Which layout do you want?
 echo.
-echo    [1] One folder   dist\%NAME%\        starts instantly, about 90 MB
+echo    [1] One folder   dist\%NAME%\        starts instantly, about 58 MB
 echo                     share the whole folder, or zip it
 echo.
-echo    [2] Single file  dist\%NAME%.exe     one portable file, about 45 MB
+echo    [2] Single file  dist\%NAME%.exe     one portable file, about 24 MB
 echo                     each launch takes a few seconds to unpack
 echo.
 
@@ -160,38 +160,19 @@ REM
 echo Building %MODE:--=% ... this takes a couple of minutes.
 echo.
 
-%PYCMD% -m PyInstaller "%ROOT%\br_editor.py" ^
-    --name %NAME% ^
-    %MODE% ^
-    --windowed ^
+REM  The excludes and the file filter now live in build\brde.spec, which also
+REM  drops opengl32sw.dll, Qt6Pdf, Qt6Network, Qt6Svg and translations.
+set "BRDE_ROOT=%ROOT%"
+set "BRDE_NAME=%NAME%"
+set "BRDE_ICON=%ICONSRC%"
+set "BRDE_ONEFILE=0"
+if "%MODE%"=="--onefile" set "BRDE_ONEFILE=1"
+
+%PYCMD% -m PyInstaller "%HERE%brde.spec" ^
     --noconfirm ^
     --clean ^
-    %ICON% ^
     --distpath "%ROOT%\dist" ^
-    --workpath "%WORK%" ^
-    --specpath "%WORK%" ^
-    --paths "%ROOT%" ^
-    --collect-submodules openpyxl ^
-    --exclude-module PIL ^
-    --exclude-module lxml ^
-    --exclude-module tkinter ^
-    --exclude-module pytest ^
-    --exclude-module PyQt6.QtQml ^
-    --exclude-module PyQt6.QtQuick ^
-    --exclude-module PyQt6.QtQuick3D ^
-    --exclude-module PyQt6.QtWebEngineCore ^
-    --exclude-module PyQt6.QtWebEngineWidgets ^
-    --exclude-module PyQt6.QtMultimedia ^
-    --exclude-module PyQt6.QtMultimediaWidgets ^
-    --exclude-module PyQt6.QtCharts ^
-    --exclude-module PyQt6.QtDataVisualization ^
-    --exclude-module PyQt6.QtBluetooth ^
-    --exclude-module PyQt6.QtNetworkAuth ^
-    --exclude-module PyQt6.QtPositioning ^
-    --exclude-module PyQt6.QtSensors ^
-    --exclude-module PyQt6.QtSerialPort ^
-    --exclude-module PyQt6.QtTest ^
-    --exclude-module PyQt6.QtSql
+    --workpath "%WORK%"
 
 if errorlevel 1 goto build_failed
 
@@ -236,3 +217,4 @@ echo         Intermediate files were kept in  build\_work  for diagnosis.
 echo.
 if "%~1"=="" pause
 exit /b 1
+

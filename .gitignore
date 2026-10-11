@@ -7,3 +7,5 @@ dist/
 CLAUDE.MD
 tests/
 beta/
+!build/brde.spec
+
