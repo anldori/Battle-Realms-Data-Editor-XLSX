@@ -8,8 +8,27 @@ Browse and edit every sheet with real names instead of raw code numbers, look up
 unit's full stats on one page, compare your mod against vanilla, and save without
 damaging the workbook.
 
-It also **opens the old `.dat` files, read-only**, so a mod written before the game
-changed format can still be read.
+It also **opens the old `.dat` files, read-only**, so a mod written before the format
+change can still be read.
+
+---
+
+## Table of contents
+
+- [Getting started](#getting-started)
+  - [Running from source (recommended)](#running-from-source-recommended)
+  - [Pre-built .exe (older versions)](#pre-built-exe-older-versions)
+  - [Opening your file](#opening-your-file)
+  - [Opening the old `.dat` file](#opening-the-old-dat-file)
+- [Everything about a unit on one page](#everything-about-a-unit-on-one-page)
+- [Which unit beats which](#which-unit-beats-which)
+- [Comparing two files](#comparing-two-files)
+- [Features](#features)
+- [Menu bar](#menu-bar)
+- [Your file stays intact](#your-file-stays-intact)
+- [Sharing it with someone who doesn't have Python](#sharing-it-with-someone-who-doesnt-have-python)
+  - [If your antivirus flags the .exe](#if-your-antivirus-flags-the-exe)
+- [Good to know](#good-to-know)
 
 ---
 
@@ -17,9 +36,7 @@ changed format can still be read.
 
 ### Running from source (recommended)
 
-For the latest features and improvements, run directly from source code. Two ways:
-
-**From a copy of this repository:**
+For the latest features, run from source. Two ways:
 
 **1. Double-click `quick_start.bat`** (Windows). It sets everything up for you:
 
@@ -67,9 +84,8 @@ on the welcome screen.
 ### Opening the old `.dat` file
 
 **File ▸ Open old .dat file…**, or the second button on the welcome screen, reads
-`Battle Realms.dat` - the format the spreadsheet replaced. Useful for reading a mod
-made before the game changed format, or for seeing what the old file held that yours
-does not.
+`Battle Realms.dat` - the format the spreadsheet replaced. Useful for a mod made before
+the format change, or for seeing what the old file held that yours does not.
 
 **It opens read-only.** Everything that reads works on it: browsing sheets, dropdowns
 instead of code numbers, `Ctrl+I` record details, `Ctrl+U` unit comparison, colour
